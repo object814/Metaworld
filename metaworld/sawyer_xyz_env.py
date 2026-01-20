@@ -6,6 +6,7 @@ import copy
 import pickle
 from functools import cached_property
 from typing import Any, Callable, Literal, SupportsFloat
+from scipy.spatial.transform import Rotation as R
 
 import mujoco
 import numpy as np
@@ -67,6 +68,20 @@ class SawyerMocapBase(mjenv_gym):
     def get_endeff_pos(self) -> npt.NDArray[Any]:
         """Returns the position of the end effector."""
         return self.data.body("hand").xpos
+    
+    def get_endeff_orientation(self, type="xyz") -> npt.NDArray[Any]:
+        """Returns the orientation of the end effector."""
+        quat = self.data.body("hand").xquat
+        if type == "quat":
+            return quat
+        if type == "xyz":
+            return R.from_quat(quat).as_euler("xyz")
+        else:
+            raise NotImplementedError(f"Orientation type {type} not implemented. Please choose from 'quat' or 'xyz'(euler).")
+        
+    def get_endeff_vel(self) -> npt.NDArray[Any]:
+        """Returns the linear velocity of the end effector."""
+        return self.data.body("hand").cvel[3:6]
 
     @property
     def tcp_center(self) -> npt.NDArray[Any]:
@@ -143,12 +158,26 @@ class SawyerMocapBase(mjenv_gym):
 class SawyerXYZEnv(SawyerMocapBase, EzPickle):
     """The base environment for all Sawyer Mujoco envs that use mocap for XYZ control."""
 
-    _HAND_SPACE = Box(
-        np.array([-0.525, 0.348, -0.0525]),
-        np.array([+0.525, 1.025, 0.7]),
+    _HAND_POS_SPACE = Box(
+        np.array([-0.525, 0.348, -0.0525]), # pos low
+        np.array([+0.525, 1.025, 0.7]), # pos high
         dtype=np.float64,
     )
     """Bounds for hand position."""
+
+    # _HAND_EULER_SPACE = Box(
+    #     np.array([-3.14, -3.14, -3.14]),  # euler low
+    #     np.array([+3.14, +3.14, +3.14]),  # euler high
+    #     dtype=np.float64,
+    # )
+    # """Bounds for hand euler angles."""
+
+    _HAND_VEL_SPACE = Box(
+        np.array([-np.inf, -np.inf, -np.inf]),  # vel low
+        np.array([+np.inf, +np.inf, +np.inf]),  # vel high
+        dtype=np.float64,
+    )
+    """Bounds for hand linear velocity."""
 
     max_path_length: int = 500
     """The maximum path length for the environment (the task horizon)."""
@@ -179,7 +208,7 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
         hand_high: XYZ = (0.2, 0.75, 0.3),
         mocap_low: XYZ | None = None,
         mocap_high: XYZ | None = None,
-        action_scale: float = 1.0 / 100,
+        action_scale: float = 1.0 / 80, # with this scaling, we roughly get "ee_vel=action"
         action_rot_scale: float = 1.0,
         render_mode: RenderMode | None = None,
         camera_id: int | None = None,
@@ -482,6 +511,8 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
         """
 
         pos_hand = self.get_endeff_pos()
+        # euler_hand = self.get_endeff_orientation("xyz")
+        vel_hand = self.get_endeff_vel()
 
         finger_right, finger_left = (
             self.data.body("rightclaw"),
@@ -508,7 +539,7 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
         obs_obj_padded[: len(obj_pos) + len(obj_quat)] = np.hstack(
             [np.hstack((pos, quat)) for pos, quat in zip(obj_pos_split, obj_quat_split)]
         )
-        return np.hstack((pos_hand, gripper_distance_apart, obs_obj_padded))
+        return np.hstack((pos_hand, vel_hand, gripper_distance_apart, obs_obj_padded))
 
     def _get_obs(self) -> npt.NDArray[np.float64]:
         """Frame stacks `_get_curr_obs_combined_no_goal()` and concatenates the goal position to form a single flat observation.
@@ -553,10 +584,14 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
         return Box(
             np.hstack(
                 (
-                    self._HAND_SPACE.low,
+                    self._HAND_POS_SPACE.low,
+                    # self._HAND_EULER_SPACE.low,
+                    self._HAND_VEL_SPACE.low,
                     gripper_low,
                     obj_low,
-                    self._HAND_SPACE.low,
+                    self._HAND_POS_SPACE.low,
+                    # self._HAND_EULER_SPACE.low,
+                    self._HAND_VEL_SPACE.low,
                     gripper_low,
                     obj_low,
                     goal_low,
@@ -564,10 +599,14 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
             ),
             np.hstack(
                 (
-                    self._HAND_SPACE.high,
+                    self._HAND_POS_SPACE.high,
+                    # self._HAND_EULER_SPACE.high,
+                    self._HAND_VEL_SPACE.high,
                     gripper_high,
                     obj_high,
-                    self._HAND_SPACE.high,
+                    self._HAND_POS_SPACE.high,
+                    # self._HAND_EULER_SPACE.high,
+                    self._HAND_VEL_SPACE.high,
                     gripper_high,
                     obj_high,
                     goal_high,
@@ -676,8 +715,8 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
         self.curr_path_length = 0
         self.reset_model()
         obs, info = super().reset()
-        self._prev_obs = obs[:18].copy()
-        obs[18:36] = self._prev_obs
+        self._prev_obs = obs[:21].copy()
+        obs[21:42] = self._prev_obs
         obs = obs.astype(np.float64)
         return obs, info
 

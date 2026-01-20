@@ -47,3 +47,10 @@ class HammerInitConfigDict(TypedDict):
 class StickInitConfigDict(TypedDict):
     stick_init_pos: npt.NDArray[Any]
     hand_init_pos: npt.NDArray[Any]
+
+class CompoPickPlaceDrawerInitConfigDict(TypedDict):
+    drawer_init_angle: NotRequired[float]
+    drawer_init_pos: npt.NDArray[Any]
+    obj_init_angle: NotRequired[float]
+    obj_init_pos: npt.NDArray[Any]
+    hand_init_pos: npt.NDArray[Any]

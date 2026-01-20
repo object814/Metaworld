@@ -10,7 +10,7 @@ class ProprioImageObsWrapper(gym.ObservationWrapper):
     """
     Gym environment observation wrapper, returns a dict observation with:
       {
-        "proprio": <robot ee pos (3) + gripper state (1), float32>,
+        "proprio": <robot ee pos (3) + robot ee vel(3) + gripper state (1), float32>,
         "image": <rgb image (H,W,3), uint8>
       }
 
@@ -35,7 +35,7 @@ class ProprioImageObsWrapper(gym.ObservationWrapper):
         proprio_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(4,),
+            shape=(7,),
             dtype=np.float32,
         )
 
@@ -71,10 +71,8 @@ class ProprioImageObsWrapper(gym.ObservationWrapper):
 
     def observation(self, obs):
         """Return dict observation with proprio and image."""
-        # Original observation is assumed to be a 1D array, with first 4 values as proprio
-        proprio = np.asarray(obs[:4], dtype=np.float32)
-        if proprio.shape != (4,):
-            proprio = proprio.reshape(4,)
+        # Original observation is assumed to be a 1D array, with first 7 values as proprio
+        proprio = np.asarray(obs[:7], dtype=np.float32)
 
         frame = self.env.render()
         if frame is None:
@@ -86,7 +84,7 @@ class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
     """
     Gym environment observation wrapper, returns a dict observation with:
       {
-        "proprio": <robot ee pos (3) + gripper state (1), float32>,
+        "proprio": <robot ee pos (3) + robot ee vel(3) + gripper state (1), float32>,
         "images": <rgb image (N,H,W,3), uint8> # staced images from N cameras
       }
 
@@ -124,7 +122,7 @@ class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
         proprio_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(4,),
+            shape=(7,),
             dtype=np.float32,
         )
         # --- Image space ---
@@ -169,8 +167,8 @@ class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
     
     def observation(self, obs):
         """Return dict observation with proprio and image."""
-        # Original observation is assumed to be a 1D array, with first 4 values as proprio
-        proprio = np.asarray(obs[:4], dtype=np.float32)
+        # Original observation is assumed to be a 1D array, with first 7 values as proprio
+        proprio = np.asarray(obs[:7], dtype=np.float32)
         images = self._get_multi_camera_frames().astype(np.uint8)
 
         return {"proprio": proprio, "images": images}

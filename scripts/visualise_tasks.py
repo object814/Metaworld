@@ -26,8 +26,9 @@ def render_episode(env_name, out_path="out.gif", episode_length=500, random_acti
         if random_actions:
             action = env.action_space.sample()
         else:
-            action = np.zeros(env.action_space.shape, dtype=np.float32)
+            action = np.array([0.02, -0.02, 0.01, 0.1])
         obs, reward, terminated, truncated, info = env.step(action)
+        print(f"EE Pos: {obs['proprio'][0]:.3f}, {obs['proprio'][1]:.3f}, {obs['proprio'][2]:.3f}, EE velocity: {obs['proprio'][3]:.3f}, {obs['proprio'][4]:.3f}, {obs['proprio'][5]:.3f}, Gripper Val: {obs['proprio'][6]:.3f}")
         # frame = env.render()
         frames.append(obs["image"])
         if terminated or truncated:
@@ -50,8 +51,9 @@ def render_episode_multi_camera(env_name, out_path="out.gif", episode_length=500
         if random_actions:
             action = env.action_space.sample()
         else:
-            action = np.zeros(env.action_space.shape, dtype=np.float32)
+            action = np.array([0.02, -0.02, 0.01, 0.1])
         obs, reward, terminated, truncated, info = env.step(action)
+        print(f"EE Pos: {obs['proprio'][0]:.3f}, {obs['proprio'][1]:.3f}, {obs['proprio'][2]:.3f}, EE velocity: {obs['proprio'][3]:.3f}, {obs['proprio'][4]:.3f}, {obs['proprio'][5]:.3f}, Gripper Val: {obs['proprio'][6]:.3f}")
         # frame = env.render()
         # Combine multiple camera images side by side
         combined_frame = np.concatenate(obs["images"], axis=1)
@@ -64,7 +66,7 @@ def render_episode_multi_camera(env_name, out_path="out.gif", episode_length=500
     print(f"Wrote {out_path} ({len(frames)} frames) in {time.time()-time_stamp:.2f} seconds.")
 
 if __name__ == "__main__":
-    render_episode(PICK_ENV, out_path="pick_place.gif", episode_length=100)
-    render_episode(DRAWER_ENV, out_path="drawer_open.gif", episode_length=100)
-    render_episode_multi_camera(PICK_ENV, out_path="pick_place_multi_cam.gif", episode_length=100)
-    render_episode_multi_camera(DRAWER_ENV, out_path="drawer_open_multi_cam.gif", episode_length=100)
+    render_episode(PICK_ENV, out_path="pick_place.gif", episode_length=100, random_actions=False)
+    render_episode(DRAWER_ENV, out_path="drawer_open.gif", episode_length=100, random_actions=False)
+    render_episode_multi_camera(PICK_ENV, out_path="pick_place_multi_cam.gif", episode_length=100, random_actions=False)
+    render_episode_multi_camera(DRAWER_ENV, out_path="drawer_open_multi_cam.gif", episode_length=100, random_actions=False)

@@ -154,3 +154,5 @@ flake.nix
 flake.lock
 .direnv
 .envrc
+
+*.gif

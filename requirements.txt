@@ -1,1 +1,2 @@
 packaging==25.0
+opencv_python==4.13.0.90

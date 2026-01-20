@@ -32,7 +32,7 @@ env = gym.make(env_name=env_name, render_mode=render_mode, camera_name=camera_na
 
 ```
 
-The ID of the camera (from Mujoco) can also be passed if known.
+The ID of the camera (from Mujoco) can also be passed.
 
 ```python
 
@@ -40,4 +40,43 @@ camera_id = '' # this is an integer that represents the camera ID from Mujoco
 
 env = gym.make(env_name=env_name, render_mode=render_mode, camera_id=camera_id)
 
+```
+
+> Camera views may be rotated in this documentation for optimal presentation.
+
+**corner** or **id: 1**
+```{figure} ../_static/rendering/corner.png
+   :alt: Camera Name Corner
+   :width: 200
+
+```
+
+**corner2** or **id: 2**
+```{figure} ../_static/rendering/corner2.png
+   :alt: Camera Name Corner2
+   :width: 200
+```
+
+**corner3** or **id: 3**
+```{figure} ../_static/rendering/corner3.png
+   :alt: Camera Name Corner3
+   :width: 200
+```
+
+**topview** or **id: 0**
+```{figure} ../_static/rendering/topview.png
+   :alt: Camera Name Topview
+   :width: 200
+```
+
+**behindGripper** or **id: 4**
+```{figure} ../_static/rendering/behindGripper.png
+   :alt: Camera Name BehindGripper
+   :width: 200
+```
+
+**gripperPOV** or **id: 5**
+```{figure} ../_static/rendering/gripperPOV.png
+   :alt: Camera Name GripperPOV
+   :width: 200
 ```

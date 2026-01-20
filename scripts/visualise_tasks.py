@@ -8,7 +8,8 @@ import numpy as np
 
 from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
-sys.path.append(str(BASE_DIR))
+sys.path.insert(0, str(BASE_DIR))
+import metaworld
 from metaworld.utils.obs_wrapper import ProprioImageObsWrapper, ProprioMultiImageObsWrapper
 
 # choose task names

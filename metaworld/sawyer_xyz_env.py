@@ -502,12 +502,12 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
         return self._target_pos
 
     def _get_curr_obs_combined_no_goal(self) -> npt.NDArray[np.float64]:
-        """Combines the end effector's {pos, closed amount} and the object(s)' {pos, quat} into a single flat observation.
+        """Combines the end effector's {pos, closed amount}, the object(s)' {pos, quat}, and end effector's {velocity} into a single flat observation.
 
         Note: The goal's position is *not* included in this.
 
         Returns:
-            The flat observation array (18 elements)
+            The flat observation array (14 elements)
         """
 
         pos_hand = self.get_endeff_pos()
@@ -539,7 +539,7 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
         obs_obj_padded[: len(obj_pos) + len(obj_quat)] = np.hstack(
             [np.hstack((pos, quat)) for pos, quat in zip(obj_pos_split, obj_quat_split)]
         )
-        return np.hstack((pos_hand, vel_hand, gripper_distance_apart, obs_obj_padded))
+        return np.hstack((pos_hand, gripper_distance_apart, obs_obj_padded, vel_hand))
 
     def _get_obs(self) -> npt.NDArray[np.float64]:
         """Frame stacks `_get_curr_obs_combined_no_goal()` and concatenates the goal position to form a single flat observation.
@@ -586,14 +586,14 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
                 (
                     self._HAND_POS_SPACE.low,
                     # self._HAND_EULER_SPACE.low,
-                    self._HAND_VEL_SPACE.low,
                     gripper_low,
                     obj_low,
+                    self._HAND_VEL_SPACE.low,
                     self._HAND_POS_SPACE.low,
                     # self._HAND_EULER_SPACE.low,
-                    self._HAND_VEL_SPACE.low,
                     gripper_low,
                     obj_low,
+                    self._HAND_VEL_SPACE.low,
                     goal_low,
                 )
             ),
@@ -601,14 +601,14 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
                 (
                     self._HAND_POS_SPACE.high,
                     # self._HAND_EULER_SPACE.high,
-                    self._HAND_VEL_SPACE.high,
                     gripper_high,
                     obj_high,
+                    self._HAND_VEL_SPACE.high,
                     self._HAND_POS_SPACE.high,
                     # self._HAND_EULER_SPACE.high,
-                    self._HAND_VEL_SPACE.high,
                     gripper_high,
                     obj_high,
+                    self._HAND_VEL_SPACE.high,
                     goal_high,
                 )
             ),
@@ -667,7 +667,9 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
         )
         assert isinstance(self._last_stable_obs, np.ndarray)
         reward, info = self.evaluate_state(self._last_stable_obs, action)
-        # step will never return a terminate==True if there is a success
+        # Originally for metaworld, step will never return a terminate==True if there is a success
+        # Dreamer needs terminate==True when task is successful to learn properly
+        terminate = info.get("success", False)
         # but we can return truncate=True if the current path length == max path length
         truncate = False
         if self.curr_path_length == self.max_path_length:
@@ -675,7 +677,7 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
         return (
             np.array(self._last_stable_obs, dtype=np.float64),
             reward,
-            False,
+            terminate,
             truncate,
             info,
         )

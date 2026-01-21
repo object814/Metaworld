@@ -156,3 +156,4 @@ flake.lock
 .envrc
 
 *.gif
+gifs/

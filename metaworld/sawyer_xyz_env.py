@@ -669,7 +669,7 @@ class SawyerXYZEnv(SawyerMocapBase, EzPickle):
         reward, info = self.evaluate_state(self._last_stable_obs, action)
         # Originally for metaworld, step will never return a terminate==True if there is a success
         # Dreamer needs terminate==True when task is successful to learn properly
-        terminate = info.get("success", False)
+        terminate = bool(info.get("success", False))
         # but we can return truncate=True if the current path length == max path length
         truncate = False
         if self.curr_path_length == self.max_path_length:

@@ -15,10 +15,11 @@ from metaworld.wrappers import ProprioImageObsWrapper, ProprioMultiImageObsWrapp
 # choose task names
 PICK_ENV = "pick-place-v3"
 DRAWER_ENV = "drawer-open-v3"
+COMPO_ENV = "compo-draweropen-pickplace"
 
 def render_episode(env_name, out_path="out.gif", episode_length=500, random_actions=True):
     env = gym.make("Meta-World/MT1", env_name=env_name, render_mode="rgb_array", camera_name="topview")
-    env = ProprioImageObsWrapper(env, image_height=128, image_width=128)
+    env = ProprioImageObsWrapper(env, image_height=480, image_width=480)
     obs, info = env.reset()
     frames = []
     time_stamp = time.time()
@@ -41,8 +42,8 @@ def render_episode(env_name, out_path="out.gif", episode_length=500, random_acti
 def render_episode_multi_camera(env_name, out_path="out.gif", episode_length=500, random_actions=True):
     env = gym.make("Meta-World/MT1", env_name=env_name, render_mode="rgb_array")
     env = ProprioMultiImageObsWrapper(env,
-                                      image_height=128,
-                                      image_width=128,
+                                      image_height=480,
+                                      image_width=480,
                                       camera_names=["topview", "front", "gripperPOV"])
     obs, info = env.reset()
     frames = []
@@ -72,7 +73,9 @@ def render_episode_multi_camera(env_name, out_path="out.gif", episode_length=500
     print(f"Wrote {out_path} ({len(frames)} frames) in {time.time()-time_stamp:.2f} seconds.")
 
 if __name__ == "__main__":
-    render_episode(PICK_ENV, out_path="gifs/pick_place.gif", episode_length=100, random_actions=False)
-    render_episode(DRAWER_ENV, out_path="gifs/drawer_open.gif", episode_length=100, random_actions=False)
-    render_episode_multi_camera(PICK_ENV, out_path="gifs/pick_place_multi_cam.gif", episode_length=100, random_actions=False)
-    render_episode_multi_camera(DRAWER_ENV, out_path="gifs/drawer_open_multi_cam.gif", episode_length=100, random_actions=False)
+    render_episode(COMPO_ENV, out_path="gifs/compo_draweropen_pickplace.gif", episode_length=1, random_actions=False)
+    render_episode_multi_camera(COMPO_ENV, out_path="gifs/compo_draweropen_pickplace_multi_cam.gif", episode_length=1, random_actions=False)
+    render_episode(PICK_ENV, out_path="gifs/pick_place.gif", episode_length=1, random_actions=False)
+    render_episode(DRAWER_ENV, out_path="gifs/drawer_open.gif", episode_length=1, random_actions=False)
+    render_episode_multi_camera(PICK_ENV, out_path="gifs/pick_place_multi_cam.gif", episode_length=1, random_actions=False)
+    render_episode_multi_camera(DRAWER_ENV, out_path="gifs/drawer_open_multi_cam.gif", episode_length=1, random_actions=False)

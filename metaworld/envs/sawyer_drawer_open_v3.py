@@ -88,7 +88,7 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
         return reward, info
 
     def _get_id_main_object(self) -> int:
-        return self.model.geom_name2id("objGeom")
+        return self.model.geom_name2id("DrawerHandleGeom")
 
     def _get_pos_objects(self) -> npt.NDArray[Any]:
         return self.get_body_com("drawer_link") + np.array([0.0, -0.16, 0.0])

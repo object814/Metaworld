@@ -24,6 +24,9 @@ EnvArgsKwargsDict: TypeAlias = (
 )
 
 ENV_CLS_MAP = {
+    # Compo tasks
+    "compo-draweropen-pickplace": envs.CompoDrawerOpenPickPlaceEnv,
+
     "assembly-v3": envs.SawyerNutAssemblyEnvV3,
     "basketball-v3": envs.SawyerBasketballEnvV3,
     "bin-picking-v3": envs.SawyerBinPickingEnvV3,
@@ -216,6 +219,9 @@ def _create_observable_goal_envs(all_envs: EnvDict) -> EnvDict:
 
 ALL_V3_ENVIRONMENTS = _get_env_dict(
     [
+        # Compo tasks
+        "compo-draweropen-pickplace",
+        
         "assembly-v3",
         "basketball-v3",
         "bin-picking-v3",

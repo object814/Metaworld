@@ -1,3 +1,7 @@
+# Compo tasks
+from metaworld.envs.compo_draweropen_pickplace import CompoDrawerOpenPickPlaceEnv
+
+
 from metaworld.envs.sawyer_assembly_peg_v3 import SawyerNutAssemblyEnvV3
 from metaworld.envs.sawyer_basketball_v3 import SawyerBasketballEnvV3
 from metaworld.envs.sawyer_bin_picking_v3 import SawyerBinPickingEnvV3
@@ -52,6 +56,9 @@ from metaworld.envs.sawyer_window_close_v3 import SawyerWindowCloseEnvV3
 from metaworld.envs.sawyer_window_open_v3 import SawyerWindowOpenEnvV3
 
 __all__ = [
+    # Compo tasks
+    "CompoDrawerOpenPickPlaceEnv",
+
     "SawyerNutAssemblyEnvV3",
     "SawyerBasketballEnvV3",
     "SawyerBinPickingEnvV3",

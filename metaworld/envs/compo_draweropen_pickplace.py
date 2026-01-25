@@ -31,10 +31,11 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
         hand_high = (0.5, 1, 0.5)
 
         # Initialisation bound for hand and objects
-        drawer_low = (0.09, 0.9, 0.0)
-        drawer_high = (0.1, 0.9, 0.0)
-        obj_low = (-1.0, 0.6, 0.02)
-        obj_high = (-0.99, 0.6, 0.02)
+        # We need to stagger the drawer and object init positions to avoid collisions
+        drawer_low = (-0.2, 0.9, 0.0)
+        drawer_high = (0.0, 0.9, 0.0)
+        obj_low = (0.0, 0.6, 0.02)
+        obj_high = (0.2, 0.7, 0.02)
 
         # Task specific flag
         self.drawer_opened = False
@@ -90,7 +91,13 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
         self.data.qpos[qpos_adr] = 0.0
         # Block
         block_pos = rand_vec[3:]
-        self.model.body("obj").pos = block_pos
+        # Get free joint id
+        joint_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_JOINT, "obj"
+        )
+        qpos_adr = self.model.jnt_qposadr[joint_id]
+        # Set position
+        self.data.qpos[qpos_adr : qpos_adr + 3] = block_pos
         self.obj_init_pos = block_pos
         # Apply changes
         mujoco.mj_forward(self.model, self.data)

@@ -12,70 +12,76 @@ sys.path.insert(0, str(BASE_DIR))
 import metaworld
 from metaworld.wrappers import ProprioImageObsWrapper, ProprioMultiImageObsWrapper
 
-# choose task names
-PICK_ENV = "pick-place-v3"
-DRAWER_ENV = "drawer-open-v3"
-COMPO_ENV = "compo-draweropen-pickplace"
-
-def render_episode(env_name, out_path="out.gif", episode_length=500, random_actions=True):
-    env = gym.make("Meta-World/MT1", env_name=env_name, render_mode="rgb_array", camera_name="topview")
-    env = ProprioImageObsWrapper(env, image_height=480, image_width=480)
-    obs, info = env.reset()
+def render_episode(env_name,
+                   out_path="out.gif",
+                   episode_length=500,
+                   image_size=(480, 480),
+                   action_policy="random",
+                   camera_name=["topview", "front", "gripperPOV"],
+                   verbose=False):
+    multiple_cameras = None
+    if len(camera_name) == 1:
+        camera_name = camera_name[0]
+        env = gym.make("Meta-World/MT1", env_name=env_name, render_mode="rgb_array", camera_name=camera_name)
+        env = ProprioImageObsWrapper(env,
+                                     image_height=image_size[0],
+                                     image_width=image_size[1])
+        multiple_cameras = False
+    elif len(camera_name) > 1:
+        env = gym.make("Meta-World/MT1", env_name=env_name, render_mode="rgb_array")
+        env = ProprioMultiImageObsWrapper(env,
+                                          image_height=image_size[0],
+                                          image_width=image_size[1],
+                                          camera_names=camera_name)
+        multiple_cameras = True
+    else:
+        raise ValueError("camera_name should be a list with at least one camera name.")
+    
     frames = []
     time_stamp = time.time()
+
+    obs, info = env.reset()
     for t in range(episode_length):
-        if random_actions:
+        if action_policy == "random":
             action = env.action_space.sample()
+        elif action_policy == "policy":
+            # implement policy here
+            action = np.array([0.0, 0.0, 0.0, 0.0])
         else:
-            action = np.array([0.02, -0.02, 0.01, 0.1])
+            action = np.array([0.02, -0.02, 0.01, 0.1]) # Simple hardcoded action for testing
         obs, reward, terminated, truncated, info = env.step(action)
-        print(f"EE Pos: {obs['proprio'][0]:.3f}, {obs['proprio'][1]:.3f}, {obs['proprio'][2]:.3f}, EE velocity: {obs['proprio'][3]:.3f}, {obs['proprio'][4]:.3f}, {obs['proprio'][5]:.3f}, Gripper Val: {obs['proprio'][6]:.3f}")
-        # frame = env.render()
-        frames.append(obs["image"])
+        if verbose:
+            print(f"EE Pos: {obs['proprio'][0]:.3f}, {obs['proprio'][1]:.3f}, {obs['proprio'][2]:.3f}, EE velocity: {obs['proprio'][3]:.3f}, {obs['proprio'][4]:.3f}, {obs['proprio'][5]:.3f}, Gripper Val: {obs['proprio'][6]:.3f}")
+        if not multiple_cameras:
+            frames.append(obs["image"])
+        else:
+            # image observations from multiple cameras are [H, W, 3*num_cameras]
+            img = obs["image"]
+            h, w, c = img.shape
+            num_cameras = c // 3
+            camera_frames = []
+            for i in range(num_cameras):
+                camera_frame = img[:,:, i*3:(i+1)*3]
+                camera_frames.append(camera_frame)
+            combined_frame = np.concatenate(camera_frames, axis=1)
+            frames.append(combined_frame)
+
         if terminated or truncated:
             break
     env.close()
-    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    imageio.mimsave(out_path, frames, fps=30)
-    print(f"Wrote {out_path} ({len(frames)} frames) in {time.time()-time_stamp:.2f} seconds.")
 
-def render_episode_multi_camera(env_name, out_path="out.gif", episode_length=500, random_actions=True):
-    env = gym.make("Meta-World/MT1", env_name=env_name, render_mode="rgb_array")
-    env = ProprioMultiImageObsWrapper(env,
-                                      image_height=480,
-                                      image_width=480,
-                                      camera_names=["topview", "front", "gripperPOV"])
-    obs, info = env.reset()
-    frames = []
-    time_stamp = time.time()
-    for t in range(episode_length):
-        if random_actions:
-            action = env.action_space.sample()
-        else:
-            action = np.array([0.02, -0.02, 0.01, 0.1])
-        obs, reward, terminated, truncated, info = env.step(action)
-        print(f"EE Pos: {obs['proprio'][0]:.3f}, {obs['proprio'][1]:.3f}, {obs['proprio'][2]:.3f}, EE velocity: {obs['proprio'][3]:.3f}, {obs['proprio'][4]:.3f}, {obs['proprio'][5]:.3f}, Gripper Val: {obs['proprio'][6]:.3f}")
-        # image observations from multiple cameras are [H, W, 3*num_cameras]
-        img = obs["image"]
-        h, w, c = img.shape
-        num_cameras = c // 3
-        camera_frames = []
-        for i in range(num_cameras):
-            camera_frame = img[:,:, i*3:(i+1)*3]
-            camera_frames.append(camera_frame)
-        combined_frame = np.concatenate(camera_frames, axis=1)
-        frames.append(combined_frame)
-        if terminated or truncated:
-            break
-    env.close()
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     imageio.mimsave(out_path, frames, fps=30)
     print(f"Wrote {out_path} ({len(frames)} frames) in {time.time()-time_stamp:.2f} seconds.")
 
 if __name__ == "__main__":
-    render_episode(COMPO_ENV, out_path="gifs/compo_draweropen_pickplace.gif", episode_length=1, random_actions=False)
-    render_episode_multi_camera(COMPO_ENV, out_path="gifs/compo_draweropen_pickplace_multi_cam.gif", episode_length=1, random_actions=False)
-    render_episode(PICK_ENV, out_path="gifs/pick_place.gif", episode_length=1, random_actions=False)
-    render_episode(DRAWER_ENV, out_path="gifs/drawer_open.gif", episode_length=1, random_actions=False)
-    render_episode_multi_camera(PICK_ENV, out_path="gifs/pick_place_multi_cam.gif", episode_length=1, random_actions=False)
-    render_episode_multi_camera(DRAWER_ENV, out_path="gifs/drawer_open_multi_cam.gif", episode_length=1, random_actions=False)
+    # choose task names
+    PICK_ENV = "pick-place-v3"
+    DRAWER_ENV = "drawer-open-v3"
+    COMPO_ENV = "compo-draweropen-pickplace"
+
+    render_episode(COMPO_ENV,
+                   out_path="gifs/compo_draweropen_pickplace_random.gif",
+                   episode_length=10,
+                   action_policy="random",
+                   camera_name=["topview", "front", "gripperPOV"])

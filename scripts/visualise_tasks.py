@@ -5,6 +5,7 @@ import sys
 import time
 import imageio
 import numpy as np
+import cv2
 
 from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -73,6 +74,15 @@ def render_episode(env_name,
                 camera_frame = img[:,:, i*3:(i+1)*3]
                 camera_frames.append(camera_frame)
             combined_frame = np.concatenate(camera_frames, axis=1)
+            # Add reward text to top-left corner of the frame
+            combined_frame = combined_frame.copy()
+            combined_frame = cv2.putText(combined_frame,
+                                         f"Reward: {reward:.2f}",
+                                         org=(10,30),
+                                         fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                                         fontScale=1,
+                                         color=(255,0,0),
+                                         thickness=2)
             frames.append(combined_frame)
 
         if terminated or truncated:
@@ -80,7 +90,7 @@ def render_episode(env_name,
     env.close()
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    imageio.mimsave(out_path, frames, fps=30)
+    imageio.mimsave(out_path, frames, fps=15)
     print(f"Wrote {out_path} ({len(frames)} frames) in {time.time()-time_stamp:.2f} seconds.")
 
 if __name__ == "__main__":

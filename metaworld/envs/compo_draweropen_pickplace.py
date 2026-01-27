@@ -39,6 +39,7 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
 
         # Task specific flag
         self.drawer_opened = False
+        self.pickplace_completed = False
         
         super().__init__(
             hand_low=hand_low,
@@ -80,6 +81,7 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
 
         # Task specific flag
         self.drawer_opened = False
+        self.pickplace_completed = False
         
         # Task specific reset
         rand_vec = self._get_state_rand_vec()
@@ -89,6 +91,7 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
         joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "goal_slidey")
         qpos_adr = self.model.jnt_qposadr[joint_id]
         self.data.qpos[qpos_adr] = 0.0
+        self.drawer_init_pos = drawer_pos
         # Block
         block_pos = rand_vec[3:]
         # Get free joint id
@@ -183,6 +186,7 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
         tcp_obj_norm_x_z = float(np.linalg.norm(tcp_xz - obj_position_x_z, ord=2))
 
         # used for computing the tcp to object object margin in the x_z plane
+        assert self.obj_init_pos is not None
         init_obj_x_z = self.obj_init_pos + np.array([0.0, -self.obj_init_pos[1], 0.0])
         init_tcp_x_z = self.init_tcp + np.array([0.0, -self.init_tcp[1], 0.0])
         tcp_obj_x_z_margin = (
@@ -199,10 +203,17 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
         gripper_closed = min(max(0, action[-1]), 1)
         caging = reward_utils.hamacher_product(y_caging, x_z_caging)
 
-        gripping = gripper_closed if caging > 0.97 else 0.0
-        caging_and_gripping = reward_utils.hamacher_product(caging, gripping)
-        caging_and_gripping = (caging_and_gripping + caging) / 2
-        return caging_and_gripping
+        """Original metaworld code for reference"""
+        # gripping = gripper_closed if caging > 0.97 else 0.0
+        # caging_and_gripping = reward_utils.hamacher_product(caging, gripping)
+        # caging_and_gripping = (caging_and_gripping + caging) / 2
+        # return caging_and_gripping
+    
+        # smooth grasp signal (no threshold)
+        gripper_closed = np.clip(action[-1], 0.0, 1.0)
+        grasping = reward_utils.hamacher_product(caging, gripper_closed)
+        # emphasize alignment slightly more than closure
+        return 0.7 * caging + 0.3 * grasping
 
     def compute_reward(
         self, action: npt.NDArray[Any], obs: npt.NDArray[np.float64]
@@ -241,6 +252,9 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
             
             if handle_error <= 0.03:
                 self.drawer_opened = True
+
+            # Whole task reward has a range of [0, 20], normalise to [-1, 1]
+            reward = (reward - 10.0) / 10.0
                 
             return (
                 reward, 
@@ -255,6 +269,13 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
         # PHASE 2: PICK AND PLACE
         # ---------------------------------------------------------
         else:
+            # Penalty that ensures the drawer stays open
+            drawer_handle_pos = self._get_drawer_handle_pos()
+            drawer_open_error = float(np.linalg.norm(drawer_handle_pos - (self.drawer_init_pos + np.array([0.0, -0.16 - self.maxDist, 0.09]))))
+            penalty_for_opening = reward_utils.tolerance(
+                drawer_open_error, bounds=(0, 0.02), margin=self.maxDist, sigmoid="long_tail"
+            ) - 1.0
+
             current_handle_pos = self._get_drawer_handle_pos()
             
             # Offset: 0.15 back, -0.02 down
@@ -277,30 +298,51 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
 
             in_place = reward_utils.tolerance(
                 obj_to_target,
-                bounds=(0, 0.05), # Radius of success is 0.05
+                bounds=(0, _TARGET_RADIUS),
                 margin=in_place_margin,
                 sigmoid="long_tail",
             )
-            
+
+            approach = reward_utils.tolerance(
+                tcp_to_obj,
+                bounds=(0, 0.04),
+                margin=np.linalg.norm(self.obj_init_pos - self.init_tcp),
+                sigmoid="long_tail",
+            )
+
             object_grasped = self._gripper_caging_reward(action, obj_pos)
+
+            """Original metaworld code for reference"""
             in_place_and_object_grasped = reward_utils.hamacher_product(
                 object_grasped, in_place
             )
-            reward = in_place_and_object_grasped
-            
-            if (
-                tcp_to_obj < 0.02
-                and (tcp_opened > 0)
-                and (obj_pos[2] - 0.01 > self.obj_init_pos[2])
-            ):
-                reward += 1.0 + 5.0 * in_place
+            # reward = in_place_and_object_grasped
+
+            # if (
+            #     tcp_to_obj < 0.02
+            #     and (tcp_opened > 0)
+            #     and (obj_pos[2] - 0.01 > self.obj_init_pos[2])
+            # ):
+            #     reward += 1.0 + 5.0 * in_place
+            # if obj_to_target < _TARGET_RADIUS:
+            #     reward = 10.0
+
+            reward = (
+                1.0 * penalty_for_opening
+                + 0.5 * approach
+                + 2.5 * object_grasped
+                + 7.0 * in_place_and_object_grasped
+            )
             if obj_to_target < _TARGET_RADIUS:
                 reward = 10.0
 
             # When completing the drawer open task, we previously gave a +10 reward.
-            # If we do not add this,
-            # the agent will learn not to open the drawer to avoid the drop.
-            reward += 10.0
+            # If we do not add this, the agent will learn not to open the drawer to avoid the drop.
+            # Also, the maximum drawer open penalty is -1, so we additionally add +1 to ensure non-negative rewards.
+            reward += 11.0
+
+            # Whole task reward has a range of [0, 20], normalise to [-1, 1]
+            reward = (reward - 10.0) / 10.0
 
             return (
                 reward,
@@ -325,12 +367,13 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
 
         # Final Success if both tasks are done
         final_success = 0.0
-        if self.drawer_opened and dist_to_target <= 0.05:
+        if self.drawer_opened and self.pickplace_completed:
             final_success = 1.0
 
         info = {
             "success": final_success,
             "drawer_opened": float(self.drawer_opened),
+            "pickplace_completed": float(self.pickplace_completed),
             "near_object": float(tcp_to_obj <= 0.03),
             "obj_to_target": dist_to_target,
             "unscaled_reward": reward,

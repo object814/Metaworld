@@ -399,7 +399,9 @@ class ProprioImageObsWrapper(gym.ObservationWrapper):
         if frame is None:
             raise RuntimeError("env.render() returned None. Use render_mode='rgb_array'.")
         frame = self._resize(np.asarray(frame))
-        return {"proprio": proprio, "image": frame}
+
+        original_obs = np.concatenate([obs[:18], obs[21:39], obs[42:]], axis=0) # remove velocity duplicate
+        return {"proprio": proprio, "image": frame, "original_obs": original_obs}
 
 class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
     """
@@ -488,14 +490,16 @@ class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
     
     def observation(self, obs):
         """Return dict observation with proprio and image."""
-        # Original observation is assumed to be a 1D array
+        # Original observation: [previous_obs, current_obs]
         hand_pos = np.asarray(obs[:3], dtype=np.float32)
         hand_vel = np.asarray(obs[18:21], dtype=np.float32)
         gripper_state = np.asarray([obs[3]], dtype=np.float32)
         proprio = np.concatenate([hand_pos, hand_vel, gripper_state], axis=0)
         images = self._get_multi_camera_frames().astype(np.uint8)  # (H,W,3*N)
 
-        return {"proprio": proprio, "image": images}
+        original_obs = np.concatenate([obs[:18], obs[21:39], obs[42:]], axis=0) # remove velocity duplicate
+
+        return {"proprio": proprio, "image": images, "original_obs": original_obs}
     
     def close(self) -> None:
         self._renderer.close()

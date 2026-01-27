@@ -40,25 +40,50 @@ def render_episode(env_name,
         raise ValueError("camera_name should be a list with at least one camera name.")
     
     if action_policy == "policy":
-        if env_name == "pick-place-v3":
-            policy = pick_policy()
-        elif env_name == "drawer-open-v3":
-            policy = drawer_policy()
-        else:
-            raise NotImplementedError(f"Policy for {env_name} is not implemented.")
+        pickplace_policy = pick_policy()
+        draweropen_policy = drawer_policy()
+
     
     frames = []
     time_stamp = time.time()
+
+    drawer_opened = False
+    drawer_open_step = 0
+    stabled = False
+    lifted = False
 
     obs, info = env.reset()
     for t in range(episode_length):
         if action_policy == "random":
             action = env.action_space.sample()
         elif action_policy == "policy":
-            action = policy.get_action(obs["original_obs"])
+            if t == 0:
+                action = np.array([0.0, 0.0, 0.0, 0.0])
+            else:
+                if info["drawer_opened"] < 0.99 and t > 0:
+                    action = draweropen_policy.get_action(obs["original_obs"])
+                elif info["drawer_opened"] >= 0.99 and drawer_opened == False:
+                    drawer_opened = True
+                    drawer_open_step = t
+                    action = np.array([0.0, 0.0, 0.0, 0.0])
+                    print("DEBUG: Drawer opened at step", t)
+                elif drawer_opened and not stabled and not lifted:
+                    action = np.array([0.0, 0.0, 0.0, 0.0])
+                    if t - drawer_open_step >= 20:
+                        stabled = True
+                        print("DEBUG: Stabled at step", t)
+                elif drawer_opened and stabled and not lifted:
+                    action = np.array([0.0, -0.01, 0.2, 0.0])
+                    if t - drawer_open_step >= 100:
+                        lifted = True
+                        print("DEBUG: Lifted up at step", t)
+                        print("DEBUG: Start pick and place")
+                else:
+                    action = pickplace_policy.get_action(obs["original_obs"])
         else:
-            action = np.array([0.02, -0.02, 0.01, 0.1]) # Simple hardcoded action for testing
+            action = np.array([0.0, 0.0, 0.2, 0.0]) # Simple hardcoded action for testing
         obs, reward, terminated, truncated, info = env.step(action)
+        print("DEBUG: Step:", t, "Reward:", reward)
         if verbose:
             print(f"EE Pos: {obs['proprio'][0]:.3f}, {obs['proprio'][1]:.3f}, {obs['proprio'][2]:.3f}, EE velocity: {obs['proprio'][3]:.3f}, {obs['proprio'][4]:.3f}, {obs['proprio'][5]:.3f}, Gripper Val: {obs['proprio'][6]:.3f}")
         if not multiple_cameras:
@@ -89,13 +114,8 @@ if __name__ == "__main__":
     DRAWER_ENV = "drawer-open-v3"
     COMPO_ENV = "compo-draweropen-pickplace"
 
-    render_episode(PICK_ENV,
-                   out_path="gifs/pick_place_policy.gif",
-                   episode_length=100,
-                   action_policy="policy",
-                   camera_name=["topview", "front", "gripperPOV"])
-    render_episode(DRAWER_ENV,
-                   out_path="gifs/drawer_open_policy.gif",
-                   episode_length=100,
+    render_episode(COMPO_ENV,
+                   out_path="gifs/compo_policy.gif",
+                   episode_length=300,
                    action_policy="policy",
                    camera_name=["topview", "front", "gripperPOV"])

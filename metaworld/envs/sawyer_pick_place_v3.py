@@ -242,10 +242,17 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
         gripper_closed = min(max(0, action[-1]), 1)
         caging = reward_utils.hamacher_product(y_caging, x_z_caging)
 
-        gripping = gripper_closed if caging > 0.97 else 0.0
-        caging_and_gripping = reward_utils.hamacher_product(caging, gripping)
-        caging_and_gripping = (caging_and_gripping + caging) / 2
-        return caging_and_gripping
+        """Original metaworld code for reference"""
+        # gripping = gripper_closed if caging > 0.97 else 0.0
+        # caging_and_gripping = reward_utils.hamacher_product(caging, gripping)
+        # caging_and_gripping = (caging_and_gripping + caging) / 2
+        # return caging_and_gripping
+    
+        # smooth grasp signal (no threshold)
+        gripper_closed = np.clip(action[-1], 0.0, 1.0)
+        grasping = reward_utils.hamacher_product(caging, gripper_closed)
+        # emphasize alignment slightly more than closure
+        return 0.7 * caging + 0.3 * grasping
 
     def compute_reward(
         self, action: npt.NDArray[Any], obs: npt.NDArray[np.float64]
@@ -270,19 +277,43 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
             )
 
             object_grasped = self._gripper_caging_reward(action, obj)
-            in_place_and_object_grasped = reward_utils.hamacher_product(
-                object_grasped, in_place
-            )
-            reward = in_place_and_object_grasped
 
-            if (
-                tcp_to_obj < 0.02
-                and (tcp_opened > 0)
-                and (obj[2] - 0.01 > self.obj_init_pos[2])
-            ):
-                reward += 1.0 + 5.0 * in_place
+            """Original metaworld code for reference"""
+            # in_place_and_object_grasped = reward_utils.hamacher_product(
+            #     object_grasped, in_place
+            # )
+            # reward = in_place_and_object_grasped
+
+            # if (
+            #     tcp_to_obj < 0.02
+            #     and (tcp_opened > 0)
+            #     and (obj[2] - 0.01 > self.obj_init_pos[2])
+            # ):
+            #     reward += 1.0 + 5.0 * in_place
+            # if obj_to_target < _TARGET_RADIUS:
+            #     reward = 10.0
+
+            # continuous lift signal
+            lift_height = 0.10
+            lift = np.clip(
+                (obj[2] - self.obj_init_pos[2]) / lift_height,
+                0.0,
+                1.0,
+            )
+            # place should matter mostly once lifted
+            place_and_lift = reward_utils.hamacher_product(in_place, lift)
+            # release near target
+            release = reward_utils.hamacher_product(in_place, 1.0 - tcp_opened)
+            # smooth 0-10 reward
+            reward = (
+                2.0 * object_grasped
+                + 2.0 * lift
+                + 4.0 * place_and_lift
+                + 2.0 * release
+            )
             if obj_to_target < _TARGET_RADIUS:
                 reward = 10.0
+                
             return (
                 reward,
                 tcp_to_obj,

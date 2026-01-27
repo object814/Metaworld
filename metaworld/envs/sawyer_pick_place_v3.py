@@ -276,12 +276,19 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
                 sigmoid="long_tail",
             )
 
+            approach = reward_utils.tolerance(
+                tcp_to_obj,
+                bounds=(0, 0.04),
+                margin=np.linalg.norm(self.obj_init_pos - self.init_tcp),
+                sigmoid="long_tail",
+            )
+
             object_grasped = self._gripper_caging_reward(action, obj)
 
             """Original metaworld code for reference"""
-            # in_place_and_object_grasped = reward_utils.hamacher_product(
-            #     object_grasped, in_place
-            # )
+            in_place_and_object_grasped = reward_utils.hamacher_product(
+                object_grasped, in_place
+            )
             # reward = in_place_and_object_grasped
 
             # if (
@@ -293,27 +300,17 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
             # if obj_to_target < _TARGET_RADIUS:
             #     reward = 10.0
 
-            # continuous lift signal
-            lift_height = 0.10
-            lift = np.clip(
-                (obj[2] - self.obj_init_pos[2]) / lift_height,
-                0.0,
-                1.0,
-            )
-            # place should matter mostly once lifted
-            place_and_lift = reward_utils.hamacher_product(in_place, lift)
-            # release near target
-            release = reward_utils.hamacher_product(in_place, 1.0 - tcp_opened)
-            # smooth 0-10 reward
             reward = (
-                2.0 * object_grasped
-                + 2.0 * lift
-                + 4.0 * place_and_lift
-                + 2.0 * release
+                0.5 * approach
+                + 2.5 * object_grasped
+                + 7.0 * in_place_and_object_grasped
             )
             if obj_to_target < _TARGET_RADIUS:
                 reward = 10.0
-                
+
+            # Normalise from [0, 10] to [-1, 1]
+            reward = (reward - 5.0) / 5.0
+
             return (
                 reward,
                 tcp_to_obj,

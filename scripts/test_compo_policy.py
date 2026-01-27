@@ -5,6 +5,7 @@ import sys
 import time
 import imageio
 import numpy as np
+import cv2
 
 from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -83,7 +84,6 @@ def render_episode(env_name,
         else:
             action = np.array([0.0, 0.0, 0.2, 0.0]) # Simple hardcoded action for testing
         obs, reward, terminated, truncated, info = env.step(action)
-        print("DEBUG: Step:", t, "Reward:", reward)
         if verbose:
             print(f"EE Pos: {obs['proprio'][0]:.3f}, {obs['proprio'][1]:.3f}, {obs['proprio'][2]:.3f}, EE velocity: {obs['proprio'][3]:.3f}, {obs['proprio'][4]:.3f}, {obs['proprio'][5]:.3f}, Gripper Val: {obs['proprio'][6]:.3f}")
         if not multiple_cameras:
@@ -98,7 +98,17 @@ def render_episode(env_name,
                 camera_frame = img[:,:, i*3:(i+1)*3]
                 camera_frames.append(camera_frame)
             combined_frame = np.concatenate(camera_frames, axis=1)
+            # Add reward text to top-left corner of the frame
+            combined_frame = combined_frame.copy()
+            combined_frame = cv2.putText(combined_frame,
+                                         f"Reward: {reward:.2f}",
+                                         org=(10,30),
+                                         fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                                         fontScale=1,
+                                         color=(255,0,0),
+                                         thickness=2)
             frames.append(combined_frame)
+
 
         if terminated or truncated:
             break

@@ -146,7 +146,10 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
             )
 
             reward = reward_for_caging + reward_for_opening
-            reward *= 5.0
+            reward *= 5.0 # [0, 10]
+
+            # Scale to [-1, 1]
+            reward = (reward - 5.0) / 5.0
 
             return (
                 reward,

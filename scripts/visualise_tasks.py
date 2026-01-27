@@ -11,6 +11,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 import metaworld
 from metaworld.wrappers import ProprioImageObsWrapper, ProprioMultiImageObsWrapper
+from metaworld.policies.sawyer_pick_place_v3_policy import SawyerPickPlaceV3Policy as pick_policy
+from metaworld.policies.sawyer_drawer_open_v3_policy import SawyerDrawerOpenV3Policy as drawer_policy
 
 def render_episode(env_name,
                    out_path="out.gif",
@@ -37,6 +39,14 @@ def render_episode(env_name,
     else:
         raise ValueError("camera_name should be a list with at least one camera name.")
     
+    if action_policy == "policy":
+        if env_name == "pick-place-v3":
+            policy = pick_policy()
+        elif env_name == "drawer-open-v3":
+            policy = drawer_policy()
+        else:
+            raise NotImplementedError(f"Policy for {env_name} is not implemented.")
+    
     frames = []
     time_stamp = time.time()
 
@@ -45,8 +55,7 @@ def render_episode(env_name,
         if action_policy == "random":
             action = env.action_space.sample()
         elif action_policy == "policy":
-            # implement policy here
-            action = np.array([0.0, 0.0, 0.0, 0.0])
+            action = policy.get_action(obs["original_obs"])
         else:
             action = np.array([0.02, -0.02, 0.01, 0.1]) # Simple hardcoded action for testing
         obs, reward, terminated, truncated, info = env.step(action)
@@ -80,8 +89,13 @@ if __name__ == "__main__":
     DRAWER_ENV = "drawer-open-v3"
     COMPO_ENV = "compo-draweropen-pickplace"
 
-    render_episode(COMPO_ENV,
-                   out_path="gifs/compo_draweropen_pickplace_random.gif",
-                   episode_length=10,
-                   action_policy="random",
+    render_episode(PICK_ENV,
+                   out_path="gifs/pick_place_policy.gif",
+                   episode_length=100,
+                   action_policy="policy",
+                   camera_name=["topview", "front", "gripperPOV"])
+    render_episode(DRAWER_ENV,
+                   out_path="gifs/drawer_open_policy.gif",
+                   episode_length=100,
+                   action_policy="policy",
                    camera_name=["topview", "front", "gripperPOV"])

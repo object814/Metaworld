@@ -73,14 +73,24 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
             handle_error,
             caging_reward,
             opening_reward,
+            retreat_reward,
         ) = self.compute_reward(action, obs)
 
+        # Define 'near_init' as gripper being close to the starting position
+        # We use the same threshold (0.03) as other proximity checks
+        gripper_to_init_dist = np.linalg.norm(obs[:3] - self.init_tcp)
+        near_init = gripper_to_init_dist <= 0.05
+
+        # Success requires Drawer Open AND Gripper Returned
+        is_success = float((handle_error <= 0.03) and near_init)
+
         info = {
-            "success": float(handle_error <= 0.03),
+            "success": is_success,
             "near_object": float(gripper_error <= 0.03),
             "grasp_success": float(gripped > 0),
             "grasp_reward": caging_reward,
             "in_place_reward": opening_reward,
+            "retreat_reward": retreat_reward,
             "obj_to_target": handle_error,
             "unscaled_reward": reward,
         }
@@ -114,7 +124,7 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
 
     def compute_reward(
         self, action: npt.NDArray[Any], obs: npt.NDArray[np.float64]
-    ) -> tuple[float, float, float, float, float, float]:
+    ) -> tuple[float, float, float, float, float, float, float]:
         assert (
             self._target_pos is not None
         ), "`reset_model()` must be called before `compute_reward()`."
@@ -122,18 +132,14 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
             gripper = obs[:3]
             handle = obs[4:7]
 
+            # Opening Reward (Keep Drawer Open)
             handle_error = float(np.linalg.norm(handle - self._target_pos))
-
             reward_for_opening = reward_utils.tolerance(
                 handle_error, bounds=(0, 0.02), margin=self.maxDist, sigmoid="long_tail"
             )
 
+            # Caging Reward (Get to Handle)
             handle_pos_init = self._target_pos + np.array([0.0, self.maxDist, 0.0])
-            # Emphasize XY error so that gripper is able to drop down and cage
-            # handle without running into it. By doing this, we are assuming
-            # that the reward in the Z direction is small enough that the agent
-            # will be willing to explore raising a finger above the handle, hook it,
-            # and drop back down to re-gain Z reward
             scale = np.array([3.0, 3.0, 1.0])
             gripper_error = (handle - gripper) * scale
             gripper_error_init = (handle_pos_init - self.init_tcp) * scale
@@ -145,8 +151,26 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
                 sigmoid="long_tail",
             )
 
-            reward = reward_for_caging + reward_for_opening
-            reward *= 5.0 # [0, 10]
+            # Retreat Reward (Return to Inital Position)
+            dist_to_init = np.linalg.norm(gripper - self.init_tcp)
+            reward_for_retreat = reward_utils.tolerance(
+                dist_to_init,
+                bounds=(0, 0.02),
+                margin=self.maxDist, # Use similar margin to opening
+                sigmoid="long_tail",
+            )
+
+            reward = 0.0
+
+            # Reward switching logic
+            drawer_is_open = handle_error <= 0.03
+            if not drawer_is_open:
+                reward_for_retreat = 0.0
+                reward = reward_for_caging + reward_for_opening
+            else:
+                reward = reward_for_opening + 1.0 + reward_for_retreat
+                
+            reward *= 3.33 # [0, 10]
 
             # Scale to [-1, 1]
             reward = (reward - 5.0) / 5.0
@@ -158,6 +182,7 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
                 handle_error,
                 reward_for_caging,
                 reward_for_opening,
+                reward_for_retreat,
             )
         else:
             del action

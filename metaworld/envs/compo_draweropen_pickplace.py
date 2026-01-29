@@ -32,13 +32,13 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
 
         # Initialisation bound for hand and objects
         # We need to stagger the drawer and object init positions to avoid collisions
-        drawer_low = (-0.2, 0.9, 0.0)
-        drawer_high = (0.0, 0.9, 0.0)
-        obj_low = (0.0, 0.6, 0.02)
-        obj_high = (0.2, 0.7, 0.02)
+        drawer_low = (-0.3, 0.9, 0.0)
+        drawer_high = (-0.1, 0.9, 0.0)
+        obj_low = (0.1, 0.6, 0.02)
+        obj_high = (0.3, 0.7, 0.02)
 
         # Task specific flag
-        self.drawer_opened = False
+        self.drawer_open_done = False
         self.pickplace_completed = False
         
         super().__init__(
@@ -80,7 +80,7 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
         self._reset_hand()
 
         # Task specific flag
-        self.drawer_opened = False
+        self.drawer_open_done = False
         self.pickplace_completed = False
         
         # Task specific reset
@@ -124,7 +124,7 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
         Phase 1: Returns Drawer Handle position.
         Phase 2: Returns Red Block position.
         """
-        if not self.drawer_opened:
+        if not self.drawer_open_done:
             # Return Handle Position (similar to DrawerOpenEnv)
             return self.get_body_com("drawer_link") + np.array([0.0, -0.16, 0.0])
         else:
@@ -132,7 +132,7 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
             return self.get_body_com("obj")
 
     def _get_quat_objects(self) -> npt.NDArray[Any]:
-        if not self.drawer_opened:
+        if not self.drawer_open_done:
             return self.data.body("drawer_link").xquat
         else:
             return Rotation.from_matrix(
@@ -225,14 +225,14 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
         obj_pos = obs[4:7] # This is Handle in Phase 1, Block in Phase 2
         
         # ---------------------------------------------------------
-        # PHASE 1: OPEN DRAWER
+        # PHASE 1: OPEN DRAWER AND GO BACK TO INITIAL POSITION
         # ---------------------------------------------------------
-        if not self.drawer_opened:
+        if not self.drawer_open_done:
             handle_error = float(np.linalg.norm(obj_pos - self._target_pos))
             
             # Logic from SawyerDrawerOpenEnvV3
             reward_for_opening = reward_utils.tolerance(
-                handle_error, bounds=(0, 0.02), margin=self.maxDist, sigmoid="long_tail"
+                handle_error, bounds=(0, 0.03), margin=self.maxDist, sigmoid="long_tail"
             )
             
             handle_pos_init = self._target_pos + np.array([0.0, self.maxDist, 0.0])
@@ -246,15 +246,33 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
                 margin=np.linalg.norm(gripper_error_init),
                 sigmoid="long_tail",
             )
+
+            # Retreat Reward (Return to Inital Position)
+            dist_to_init = np.linalg.norm(gripper - self.hand_init_pos)
+            reward_for_retreat = reward_utils.tolerance(
+                dist_to_init,
+                bounds=(0, 0.02),
+                margin=self.maxDist, # Use similar margin to opening
+                sigmoid="long_tail",
+            )
+
+            reward = 0.0
+
+            drawer_is_open = handle_error <= 0.03
+            if not drawer_is_open:
+                reward_for_retreat = 0.0
+                reward = reward_for_caging + reward_for_opening
+            else:
+                reward_for_caging = 0.0
+                reward = 0.2 * reward_for_opening + 1.0 + 1.8 * reward_for_retreat
             
-            reward = reward_for_caging + reward_for_opening
-            reward *= 5.0
-            
-            if handle_error <= 0.03:
-                self.drawer_opened = True
+            reward *= 3.33 # [0, 10]
 
             # Whole task reward has a range of [0, 20], normalise to [-1, 1]
             reward = (reward - 10.0) / 10.0
+
+            # Task end condition
+            self.drawer_open_done = drawer_is_open and dist_to_init <= 0.03
                 
             return (
                 reward, 
@@ -367,12 +385,12 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
 
         # Final Success if both tasks are done
         final_success = 0.0
-        if self.drawer_opened and self.pickplace_completed:
+        if self.drawer_open_done and self.pickplace_completed:
             final_success = 1.0
 
         info = {
             "success": final_success,
-            "drawer_opened": float(self.drawer_opened),
+            "drawer_opened": float(self.drawer_open_done),
             "pickplace_completed": float(self.pickplace_completed),
             "near_object": float(tcp_to_obj <= 0.03),
             "obj_to_target": dist_to_target,

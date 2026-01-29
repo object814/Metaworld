@@ -41,7 +41,7 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
         self.init_config: InitConfigDict = {
             "obj_init_angle": 0.3,
             "obj_init_pos": np.array([0.0, 0.9, 0.0], dtype=np.float32),
-            "hand_init_pos": np.array([0, 0.6, 0.2], dtype=np.float32),
+            "hand_init_pos": np.array([0, 0.6, 0.25], dtype=np.float32),
         }
         self.obj_init_pos = self.init_config["obj_init_pos"]
         self.obj_init_angle = self.init_config["obj_init_angle"]
@@ -78,8 +78,8 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
 
         # Define 'near_init' as gripper being close to the starting position
         # We use the same threshold (0.03) as other proximity checks
-        gripper_to_init_dist = np.linalg.norm(obs[:3] - self.init_tcp)
-        near_init = gripper_to_init_dist <= 0.05
+        gripper_to_init_dist = np.linalg.norm(obs[:3] - self.hand_init_pos)
+        near_init = gripper_to_init_dist <= 0.03
 
         # Success requires Drawer Open AND Gripper Returned
         is_success = float((handle_error <= 0.03) and near_init)
@@ -135,7 +135,7 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
             # Opening Reward (Keep Drawer Open)
             handle_error = float(np.linalg.norm(handle - self._target_pos))
             reward_for_opening = reward_utils.tolerance(
-                handle_error, bounds=(0, 0.02), margin=self.maxDist, sigmoid="long_tail"
+                handle_error, bounds=(0, 0.03), margin=self.maxDist, sigmoid="long_tail"
             )
 
             # Caging Reward (Get to Handle)
@@ -152,7 +152,7 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
             )
 
             # Retreat Reward (Return to Inital Position)
-            dist_to_init = np.linalg.norm(gripper - self.init_tcp)
+            dist_to_init = np.linalg.norm(gripper - self.hand_init_pos)
             reward_for_retreat = reward_utils.tolerance(
                 dist_to_init,
                 bounds=(0, 0.02),
@@ -168,12 +168,11 @@ class SawyerDrawerOpenEnvV3(SawyerXYZEnv):
                 reward_for_retreat = 0.0
                 reward = reward_for_caging + reward_for_opening
             else:
-                reward = reward_for_opening + 1.0 + reward_for_retreat
-                
-            reward *= 3.33 # [0, 10]
+                reward_for_caging = 0.0
+                reward = 0.2 * reward_for_opening + 1.0 + 1.8 * reward_for_retreat
 
             # Scale to [-1, 1]
-            reward = (reward - 5.0) / 5.0
+            reward = (reward - 1.5) / 1.5
 
             return (
                 reward,

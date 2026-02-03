@@ -64,6 +64,10 @@ RUN python -m pip install --no-cache-dir --upgrade \
     torchaudio --index-url https://download.pytorch.org/whl/cu121 || \
     (echo "WARNING: CUDA-enabled torch install may have failed or fallen back to CPU-only." && exit 0)
 
+# Install additional requirements
+COPY .devcontainer/requirements.txt .
+RUN python -m pip install -r requirements.txt
+
 # Creates a non-root user with an explicit UID and adds permission to access the folder
 # For more info, please refer to https://aka.ms/vscode-docker-python-configure-containers
 # CHANGES HERE

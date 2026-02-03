@@ -12,6 +12,8 @@ from metaworld.sawyer_xyz_env import RenderMode, SawyerXYZEnv
 from metaworld.types import InitConfigDict
 from metaworld.utils import reward_utils
 
+import mujoco
+
 
 class SawyerPickPlaceEnvV3(SawyerXYZEnv):
     """SawyerPickPlaceEnv.
@@ -37,12 +39,12 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
         height: int = 480,
         width: int = 480,
     ) -> None:
-        goal_low = (-0.1, 0.8, 0.05)
-        goal_high = (0.1, 0.9, 0.3)
+        goal_low = (-0.4, 0.4, 0.2)
+        goal_high = (0.4, 0.9, 0.4)
         hand_low = (-0.5, 0.40, 0.05)
         hand_high = (0.5, 1, 0.5)
-        obj_low = (-0.1, 0.6, 0.02)
-        obj_high = (0.1, 0.7, 0.02)
+        obj_low = (-0.4, 0.4, 0.02)
+        obj_high = (0.4, 0.9, 0.02)
 
         super().__init__(
             hand_low=hand_low,
@@ -174,6 +176,12 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
         self.maxPushDist = np.linalg.norm(
             self.obj_init_pos[:2] - np.array(self._target_pos)[:2]
         )
+
+        # Custom color for target object
+        # Find the geom id by name
+        geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "objGeom")
+        # Change RGBA (R, G, B, A)
+        self.model.geom_rgba[geom_id] = np.array([1.0, 0.0, 0.0, 1.0])
 
         return self._get_obs()
 

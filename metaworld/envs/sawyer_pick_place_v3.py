@@ -37,12 +37,12 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
         height: int = 480,
         width: int = 480,
     ) -> None:
-        goal_low = (-0.1, 0.8, 0.05)
-        goal_high = (0.1, 0.9, 0.3)
+        goal_low = (-0.30, 0.4, 0.15)
+        goal_high = (0.0, 0.7, 0.35)
         hand_low = (-0.5, 0.40, 0.05)
         hand_high = (0.5, 1, 0.5)
-        obj_low = (-0.1, 0.6, 0.02)
-        obj_high = (0.1, 0.7, 0.02)
+        obj_low = (0.0, 0.4, 0.02)
+        obj_high = (0.30, 0.7, 0.02)
 
         super().__init__(
             hand_low=hand_low,

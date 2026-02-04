@@ -98,6 +98,7 @@ if __name__ == "__main__":
     PICK_ENV = "pick-place-v3"
     DRAWER_ENV = "drawer-open-v3"
     COMPO_ENV = "compo-draweropen-pickplace"
+    COMPO_PICKPLACE_ENV = "compo-pickplace"
 
     render_episode(PICK_ENV,
                    out_path="gifs/pick_place_policy.gif",
@@ -107,5 +108,15 @@ if __name__ == "__main__":
     render_episode(DRAWER_ENV,
                    out_path="gifs/drawer_open_policy.gif",
                    episode_length=100,
+                   action_policy="policy",
+                   camera_name=["topview", "front", "gripperPOV"])
+    render_episode(COMPO_ENV,
+                   out_path="gifs/compo_draweropen_pickplace_policy.gif",
+                   episode_length=200,
+                   action_policy="policy",
+                   camera_name=["topview", "front", "gripperPOV"])
+    render_episode(COMPO_PICKPLACE_ENV,
+                   out_path="gifs/compo_pickplace_policy.gif",
+                   episode_length=200,
                    action_policy="policy",
                    camera_name=["topview", "front", "gripperPOV"])

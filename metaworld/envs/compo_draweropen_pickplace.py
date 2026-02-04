@@ -32,10 +32,10 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
 
         # Initialisation bound for hand and objects
         # We need to stagger the drawer and object init positions to avoid collisions
-        drawer_low = (-0.2, 0.9, 0.0)
-        drawer_high = (0.0, 0.9, 0.0)
-        obj_low = (0.0, 0.6, 0.02)
-        obj_high = (0.2, 0.7, 0.02)
+        drawer_low = (-0.3, 0.9, 0.0)
+        drawer_high = (-0.1, 0.9, 0.0)
+        obj_low = (0.1, 0.6, 0.02)
+        obj_high = (0.3, 0.7, 0.02)
 
         # Task specific flag
         self.drawer_opened = False
@@ -343,6 +343,10 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
 
             # Whole task reward has a range of [0, 20], normalise to [-1, 1]
             reward = (reward - 10.0) / 10.0
+
+            # Mark pickplace as completed
+            if obj_to_target < _TARGET_RADIUS:
+                self.pickplace_completed = True
 
             return (
                 reward,

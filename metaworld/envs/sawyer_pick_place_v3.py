@@ -50,12 +50,12 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
             obj_high = (0.1, 0.7, 0.02)
         elif initialise_region == 'large':
             # Large initial region
-            goal_low = (-0.4, 0.4, 0.2)
-            goal_high = (0.4, 0.9, 0.4)
+            goal_low = (-0.25, 0.4, 0.1)
+            goal_high = (0.0, 0.7, 0.3)
             hand_low = (-0.5, 0.40, 0.05)
             hand_high = (0.5, 1, 0.5)
-            obj_low = (-0.4, 0.4, 0.02)
-            obj_high = (0.4, 0.9, 0.02)
+            obj_low = (0.0, 0.5, 0.02)
+            obj_high = (0.25, 0.8, 0.02)
         else:
             raise ValueError(
                 f"Invalid initialise_region: {initialise_region}. "

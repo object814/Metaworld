@@ -53,3 +53,8 @@ class CompoPickPlaceDrawerInitConfigDict(TypedDict):
     drawer_init_pos: npt.NDArray[Any]
     obj_init_pos: npt.NDArray[Any]
     hand_init_pos: npt.NDArray[Any]
+
+class CompoPickPlaceInitConfigDict(TypedDict):
+    hand_init_pos: npt.NDArray[Any]
+    obj1_init_pos: npt.NDArray[Any]
+    obj2_init_pos: npt.NDArray[Any]

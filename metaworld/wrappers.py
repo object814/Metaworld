@@ -502,5 +502,8 @@ class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
         return {"proprio": proprio, "image": images, "original_obs": original_obs}
     
     def close(self) -> None:
-        self._renderer.close()
+        try:
+            self._renderer.close()
+        except Exception:
+            pass
         return super().close()

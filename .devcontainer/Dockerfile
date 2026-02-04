@@ -40,8 +40,10 @@ RUN apt-get update && \
         libgl1-mesa-dri \
         libgles2 \
         libosmesa6 \
+        libosmesa6-dev \
         libx11-6 \
         libxext6 \
+        libglew-dev \
         libxrender1 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 

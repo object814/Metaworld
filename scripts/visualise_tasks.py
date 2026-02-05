@@ -53,6 +53,7 @@ def render_episode(env_name,
 
     obs, info = env.reset()
     for t in range(episode_length):
+        print(f"Step {t+1}/{episode_length}")
         if action_policy == "random":
             action = env.action_space.sample()
         elif action_policy == "policy":
@@ -88,6 +89,9 @@ def render_episode(env_name,
         if terminated or truncated:
             break
     env.close()
+    
+    print(f"Episode finished after {t+1} steps with reward {reward:.2f}.")
+    print(f"Rendering episode to {out_path}...")
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     imageio.mimsave(out_path, frames, fps=15)

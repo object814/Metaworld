@@ -157,3 +157,4 @@ flake.lock
 
 *.gif
 gifs/
+*.sif

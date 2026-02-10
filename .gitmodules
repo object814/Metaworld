@@ -1,3 +1,6 @@
 [submodule "third_party/dreamerv3"]
 	path = third_party/dreamerv3
 	url = https://github.com/object814/dreamerv3-torch.git
+[submodule "third_party/vjepa2"]
+	path = third_party/vjepa2
+	url = git@github.com:object814/vjepa2.git

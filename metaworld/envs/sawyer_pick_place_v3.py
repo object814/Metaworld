@@ -415,3 +415,11 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
             reward = reachRew + pickRew + placeRew
 
             return float(reward), 0.0, 0.0, float(placingDist), 0.0, 0.0
+        
+    def get_model_xml_path(self) -> str:
+        """Return the MJCF path used by this env."""
+        return self.model_name
+
+    def get_mujoco_model(self) -> mujoco.MjModel:
+        """Convenience: load a fresh MjModel from the env XML."""
+        return mujoco.MjModel.from_xml_path(self.model_name)

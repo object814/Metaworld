@@ -117,10 +117,10 @@ if __name__ == "__main__":
     render_episode(COMPO_ENV,
                    out_path="gifs/compo_draweropen_pickplace_policy.gif",
                    episode_length=200,
-                   action_policy="policy",
+                   action_policy="random",
                    camera_name=["topview", "front", "gripperPOV"])
     render_episode(COMPO_PICKPLACE_ENV,
                    out_path="gifs/compo_pickplace_policy.gif",
                    episode_length=200,
-                   action_policy="policy",
+                   action_policy="random",
                    camera_name=["topview", "front", "gripperPOV"])

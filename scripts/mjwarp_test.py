@@ -1,5 +1,5 @@
 import os
-os.environ["MUJOCO_GL"] = "egl"  # headless rendering
+os.environ["MUJOCO_GL"] = "egl"
 
 from pathlib import Path
 import numpy as np
@@ -29,29 +29,64 @@ def sample_ctrl(mjm: mujoco.MjModel, nworld: int, rng: np.random.Generator):
     hi = np.where(np.isfinite(hi), hi, 1.0)
 
     u = rng.uniform(size=(nworld, nu)).astype(np.float32)
-    ctrl = lo[None, :].astype(np.float32) + u * (hi - lo)[None, :].astype(np.float32)
-    return ctrl
+    ctrl = lo[None, :] + u * (hi - lo)[None, :]
+    return ctrl.astype(np.float32)
 
 
-def copy_world_to_cpu(mjm: mujoco.MjModel, cpu_data: mujoco.MjData, qpos_i, qvel_i):
+def copy_world_to_cpu(mjm, cpu_data, qpos_i, qvel_i):
     cpu_data.qpos[:] = qpos_i
     cpu_data.qvel[:] = qvel_i
     mujoco.mj_forward(mjm, cpu_data)
 
 
+def tile_images(images, grid_rows, grid_cols):
+    """
+    images: list of (H, W, 3) arrays
+    returns: single tiled image
+    """
+    h, w, c = images[0].shape
+    grid = np.zeros((h * grid_rows, w * grid_cols, c), dtype=np.uint8)
+
+    idx = 0
+    for r in range(grid_rows):
+        for c_ in range(grid_cols):
+            grid[r*h:(r+1)*h, c_*w:(c_+1)*w] = images[idx]
+            idx += 1
+    return grid
+
+def randomize_initial_states(mjm, d, rng, position_scale=0.05):
+    """
+    Randomize initial qpos per world.
+    For testing, we add small noise to all qpos.
+    """
+
+    qpos = d.qpos.numpy()  # shape (nworld, nq)
+
+    # Add small noise to each world
+    noise = rng.normal(scale=position_scale, size=qpos.shape)
+    qpos += noise
+
+    # Optional: zero velocities
+    qvel = np.zeros_like(d.qvel.numpy())
+
+    wp.copy(d.qpos, wp.array(qpos, dtype=wp.float32))
+    wp.copy(d.qvel, wp.array(qvel, dtype=wp.float32))
+
 def main(
     xml_path: str,
-    out_gif: str = "gifs/mjwarp_batch_debug.gif",
-    nworld: int = 256,
-    steps: int = 300,
-    render_world: int = 0,
-    width: int = 480,
-    height: int = 480,
+    out_gif: str = "gifs/mjwarp_grid.gif",
+    nworld: int = 100,
+    grid_rows: int = 10,
+    grid_cols: int = 10,
+    steps: int = 10,
+    world_res: int = 64,
     nconmax: int = 64,
     njmax: int = 256,
     seed: int = 0,
     use_graph: bool = True,
 ):
+
+    assert nworld == grid_rows * grid_cols, "Grid size must match nworld"
 
     rng = np.random.default_rng(seed)
 
@@ -67,30 +102,34 @@ def main(
         m = mjw.put_model(mjm)
         d = mjw.make_data(mjm, nworld=nworld, nconmax=nconmax, njmax=njmax)
 
-        # ----------------------------
-        # WARMUP (CRITICAL FIX)
-        # ----------------------------
-        print("Warming up MJWarp kernels...")
-        for i in range(5):
+        # Randomize initial states per world
+        randomize_initial_states(mjm, d, rng)
+
+        wp.synchronize_device()
+
+        # --------------------
+        # Warmup
+        # --------------------
+        print("Warming up...")
+        for _ in range(5):
             mjw.step(m, d)
         wp.synchronize_device()
         print("Warmup complete.")
 
-        # ----------------------------
-        # CUDA Graph Capture (optional)
-        # ----------------------------
+        # --------------------
+        # Graph capture
+        # --------------------
         graph = None
         if use_graph:
-            print("Capturing CUDA graph...")
+            print("Capturing graph...")
             with wp.ScopedCapture() as cap:
                 mjw.step(m, d)
             graph = cap.graph
             print("Graph captured.")
 
-        # CPU renderer
+        # Renderer
         cpu_data = mujoco.MjData(mjm)
-        renderer = mujoco.Renderer(mjm, height=height, width=width)
-        mujoco.mj_forward(mjm, cpu_data)
+        renderer = mujoco.Renderer(mjm, height=world_res, width=world_res)
 
         frames = []
 
@@ -107,17 +146,22 @@ def main(
             else:
                 mjw.step(m, d)
 
-            # Pull state for visualization
+            # Pull all worlds
             qpos = d.qpos.numpy()
             qvel = d.qvel.numpy()
 
-            copy_world_to_cpu(mjm, cpu_data, qpos[render_world], qvel[render_world])
+            world_images = []
 
-            renderer.update_scene(cpu_data)
-            img = renderer.render()
-            frames.append(img)
+            for i in range(nworld):
+                copy_world_to_cpu(mjm, cpu_data, qpos[i], qvel[i])
+                renderer.update_scene(cpu_data)
+                img = renderer.render()
+                world_images.append(img)
 
-            if (t + 1) % 50 == 0:
+            grid_img = tile_images(world_images, grid_rows, grid_cols)
+            frames.append(grid_img)
+
+            if (t + 1) % 1 == 0:
                 print(f"Step {t+1}/{steps}")
 
         wp.synchronize_device()
@@ -136,12 +180,12 @@ if __name__ == "__main__":
 
     main(
         xml_path=xml_path,
-        out_gif="gifs/mjwarp_pickplace_batch.gif",
-        nworld=256,
-        steps=200,
-        render_world=0,
-        width=480,
-        height=480,
+        out_gif="gifs/mjwarp_pickplace_10x10.gif",
+        nworld=100,
+        grid_rows=10,
+        grid_cols=10,
+        steps=10,
+        world_res=64,
         nconmax=64,
         njmax=256,
         use_graph=True,

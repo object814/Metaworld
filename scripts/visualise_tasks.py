@@ -43,7 +43,7 @@ def render_episode(env_name,
     if action_policy == "policy":
         if env_name == "pick-place-v3":
             policy = pick_policy()
-        elif env_name == "drawer-open-v3":
+        elif env_name == "drawer-open-v3" or env_name == "compo-draweropen-pickplace":
             policy = drawer_policy()
         else:
             raise NotImplementedError(f"Policy for {env_name} is not implemented.")
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     render_episode(COMPO_ENV,
                    out_path="gifs/compo_draweropen_pickplace_policy.gif",
                    episode_length=200,
-                   action_policy="random",
+                   action_policy="policy",
                    camera_name=["topview", "front", "gripperPOV"])
     render_episode(COMPO_PICKPLACE_ENV,
                    out_path="gifs/compo_pickplace_policy.gif",

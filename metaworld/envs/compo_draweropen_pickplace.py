@@ -32,10 +32,10 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
 
         # Initialisation bound for hand and objects
         # We need to stagger the drawer and object init positions to avoid collisions
-        drawer_low = (-0.3, 0.9, 0.0)
-        drawer_high = (-0.1, 0.9, 0.0)
-        obj_low = (0.1, 0.6, 0.02)
-        obj_high = (0.3, 0.7, 0.02)
+        drawer_low = (-0.4, 0.8, 0.0)
+        drawer_high = (-0.2, 0.9, 0.0)
+        obj_low = (0.05, 0.5, 0.02)
+        obj_high = (0.25, 0.8, 0.02)
 
         # Task specific flag
         self.drawer_opened = False
@@ -287,6 +287,8 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
             
             # Update visualization sites
             self.model.site("goal").pos = self._target_pos
+            # Make visualisation site white
+            self.model.site("goal").rgba = np.array([1.0, 1.0, 1.0, 1.0])
             
             # Logic from SawyerPickPlaceEnvV3
             _TARGET_RADIUS: float = 0.05

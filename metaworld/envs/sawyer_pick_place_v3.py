@@ -38,7 +38,7 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
         reward_function_version: str = "v2",
         height: int = 480,
         width: int = 480,
-        initialise_region: str = 'small',
+        initialise_region: str = 'large',
     ) -> None:
         if initialise_region == 'small':
             # Small initial region: Metaworld original

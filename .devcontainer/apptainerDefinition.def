@@ -1,2 +1,2 @@
 Bootstrap: docker
-From: object814/metaworld:0.0.1
+From: object814/metaworld:0.0.2

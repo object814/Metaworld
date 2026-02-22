@@ -471,7 +471,7 @@ class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
             name = mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_CAMERA, cam_id)
             if name == camera_name:
                 return cam_id
-        raise ValueError(f"Camera '{camera_name}' not found. Available cameras: {self._list_camera_names()}")
+        raise ValueError(f"Camera '{camera_name}' not found.")
     
     def _get_multi_camera_frames(self) -> np.ndarray:
         """

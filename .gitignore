@@ -158,3 +158,4 @@ flake.lock
 *.gif
 gifs/
 *.sif
+datasets/

@@ -127,7 +127,10 @@ def _render_camera(env: gym.Env, camera_name: str, height: int, width: int) -> n
         raise ValueError(f"Camera '{camera_name}' not found in model.")
     renderer.update_scene(data, camera=cam_id)
     img = renderer.render().copy()
-    renderer.close()
+    try:
+        renderer.close()
+    except Exception:
+        pass
     return img.astype(np.uint8)
 
 

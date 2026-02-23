@@ -158,5 +158,4 @@ flake.lock
 *.gif
 gifs/
 *.sif
-/datasets
-data_generation.sh
+datasets/

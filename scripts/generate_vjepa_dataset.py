@@ -54,8 +54,11 @@ from metaworld.policies import (
     SawyerDrawerOpenV3Policy,
     SawyerDrawerCloseV3Policy,
     SawyerDoorOpenV3Policy,
+    SawyerDoorCloseV3Policy,
     SawyerButtonPressV3Policy,
+    CompoDoorOpenDoorClosePolicy,
 )
+from metaworld.policies.compo_draweropen_pickplace_policy import CompoDrawerOpenPickPlacePolicy
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,7 +67,9 @@ ENV_TO_POLICY = {
     "drawer-open-v3": SawyerDrawerOpenV3Policy,
     "drawer-close-v3": SawyerDrawerCloseV3Policy,
     "door-open-v3": SawyerDoorOpenV3Policy,
-    "button-press-v3": SawyerButtonPressV3Policy,
+    "door-close-v3": SawyerDoorCloseV3Policy,
+    "compo-dooropen-doorclose": CompoDoorOpenDoorClosePolicy,
+    "compo-draweropen-pickplace": CompoDrawerOpenPickPlacePolicy,
 }
 
 

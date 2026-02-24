@@ -1,6 +1,10 @@
 # Compo tasks
+from metaworld.envs.compo_assembly_disassembly import CompoAssemblyDisassemblyEnv
+from metaworld.envs.compo_dooropen_doorclose import CompoDoorOpenDoorCloseEnv
 from metaworld.envs.compo_draweropen_pickplace import CompoDrawerOpenPickPlaceEnv
+from metaworld.envs.compo_handlepress_handlepressside import CompoHandlePressHandlePressSideEnv
 from metaworld.envs.compo_pickplace import CompoPickPlaceEnv
+from metaworld.envs.compo_windowopen_windowclose import CompoWindowOpenWindowCloseEnv
 
 
 from metaworld.envs.sawyer_assembly_peg_v3 import SawyerNutAssemblyEnvV3
@@ -59,6 +63,7 @@ from metaworld.envs.sawyer_window_open_v3 import SawyerWindowOpenEnvV3
 __all__ = [
     # Compo tasks
     "CompoDrawerOpenPickPlaceEnv",
+    "CompoAssemblyDisassemblyEnv",
     "CompoPickPlaceEnv",
 
     "SawyerNutAssemblyEnvV3",

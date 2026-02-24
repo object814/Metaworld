@@ -1,3 +1,12 @@
+from metaworld.policies.compo_assembly_disassembly_policy import (
+    CompoAssemblyDisassemblyPolicy,
+)
+from metaworld.policies.compo_dooropen_doorclose_policy import (
+    CompoDoorOpenDoorClosePolicy,
+)
+from metaworld.policies.compo_draweropen_pickplace_policy import (
+    CompoDrawerOpenPickPlacePolicy,
+)
 from metaworld.policies.sawyer_assembly_v3_policy import SawyerAssemblyV3Policy
 from metaworld.policies.sawyer_basketball_v3_policy import SawyerBasketballV3Policy
 from metaworld.policies.sawyer_bin_picking_v3_policy import SawyerBinPickingV3Policy
@@ -75,6 +84,9 @@ from metaworld.policies.sawyer_window_open_v3_policy import SawyerWindowOpenV3Po
 
 ENV_POLICY_MAP = dict(
     {
+        "compo-assembly-disassembly": CompoAssemblyDisassemblyPolicy,
+        "compo-dooropen-doorclose": CompoDoorOpenDoorClosePolicy,
+        "compo-draweropen-pickplace": CompoDrawerOpenPickPlacePolicy,
         "assembly-v3": SawyerAssemblyV3Policy,
         "basketball-v3": SawyerBasketballV3Policy,
         "bin-picking-v3": SawyerBinPickingV3Policy,
@@ -129,6 +141,9 @@ ENV_POLICY_MAP = dict(
 )
 
 __all__ = [
+    "CompoAssemblyDisassemblyPolicy",
+    "CompoDoorOpenDoorClosePolicy",
+    "CompoDrawerOpenPickPlacePolicy",
     "SawyerAssemblyV3Policy",
     "SawyerBasketballV3Policy",
     "SawyerBinPickingV3Policy",

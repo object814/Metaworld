@@ -38,7 +38,7 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
         reward_function_version: str = "v2",
         height: int = 480,
         width: int = 480,
-        initialise_region: str = 'large',
+        initialise_region: str = 'large', # TODO: find code that uses this argument instead of hardcoding
     ) -> None:
         if initialise_region == 'small':
             # Small initial region: Metaworld original
@@ -58,6 +58,14 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
             hand_high = (0.5, 1, 0.5)
             obj_low = (0.0, 0.5, 0.02)
             obj_high = (0.25, 0.8, 0.02)
+        elif initialise_region == 'fixed':
+            print(">>> Using fixed initial region")
+            goal_low = (-0.11, 0.8, 0.2)
+            goal_high = (-0.1, 0.8, 0.2)
+            hand_low = (-0.5, 0.40, 0.05)
+            hand_high = (0.5, 1, 0.5)
+            obj_low = (0.09, 0.6, 0.02)
+            obj_high = (0.1, 0.6, 0.02)
         else:
             raise ValueError(
                 f"Invalid initialise_region: {initialise_region}. "

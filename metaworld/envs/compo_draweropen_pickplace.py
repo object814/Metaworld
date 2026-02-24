@@ -330,8 +330,8 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
             #     reward = 10.0
 
             reward = (
-                1.0 * penalty_for_opening
-                + 0.5 * approach
+                0.5 * penalty_for_opening
+                + 1.0 * approach
                 + 2.5 * object_grasped
                 + 7.0 * in_place_and_object_grasped
             )

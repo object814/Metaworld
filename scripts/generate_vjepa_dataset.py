@@ -54,8 +54,11 @@ from metaworld.policies import (
     SawyerDrawerOpenV3Policy,
     SawyerDrawerCloseV3Policy,
     SawyerDoorOpenV3Policy,
+    SawyerDoorCloseV3Policy,
     SawyerButtonPressV3Policy,
+    CompoDoorOpenDoorClosePolicy,
 )
+from metaworld.policies.compo_draweropen_pickplace_policy import CompoDrawerOpenPickPlacePolicy
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,7 +67,9 @@ ENV_TO_POLICY = {
     "drawer-open-v3": SawyerDrawerOpenV3Policy,
     "drawer-close-v3": SawyerDrawerCloseV3Policy,
     "door-open-v3": SawyerDoorOpenV3Policy,
-    "button-press-v3": SawyerButtonPressV3Policy,
+    "door-close-v3": SawyerDoorCloseV3Policy,
+    "compo-dooropen-doorclose": CompoDoorOpenDoorClosePolicy,
+    "compo-draweropen-pickplace": CompoDrawerOpenPickPlacePolicy,
 }
 
 
@@ -127,7 +132,10 @@ def _render_camera(env: gym.Env, camera_name: str, height: int, width: int) -> n
         raise ValueError(f"Camera '{camera_name}' not found in model.")
     renderer.update_scene(data, camera=cam_id)
     img = renderer.render().copy()
-    renderer.close()
+    try:
+        renderer.close()
+    except Exception:
+        pass
     return img.astype(np.uint8)
 
 
@@ -139,6 +147,7 @@ def collect_episode(
     episode_length: int,
     camera_names: list[str],
     image_size: int,
+    seed: int | None = None,
 ) -> dict:
     """Roll out one episode.  Returns a dict of arrays."""
     # storage
@@ -147,7 +156,9 @@ def collect_episode(
     actions_raw = []  # (T, 4)  raw Metaworld actions
     extrinsics = {cam: [] for cam in camera_names}  # (T, 7)
 
-    obs_raw, info = env.reset()
+    obs_raw, info = env.reset(seed=seed)
+    if hasattr(policy, "reset"):
+        policy.reset()
     # Extract proprio from raw obs
     hand_pos = obs_raw[:3].astype(np.float32)
     hand_vel = obs_raw[18:21].astype(np.float32)
@@ -289,11 +300,10 @@ def main():
 
     while collected < args.num_episodes:
         ep_seed = args.seed + attempted
-        env.reset(seed=ep_seed)
         attempted += 1
 
         episode_data = collect_episode(
-            env, policy, args.episode_length, args.camera_names, args.image_size
+            env, policy, args.episode_length, args.camera_names, args.image_size, seed=ep_seed
         )
 
         if args.only_successful and not episode_data["success"]:

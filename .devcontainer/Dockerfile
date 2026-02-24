@@ -70,6 +70,9 @@ RUN python -m pip install --no-cache-dir --upgrade \
 COPY .devcontainer/requirements.txt .
 RUN python -m pip install -r requirements.txt
 
+# Install numpy 1.23.5 version
+RUN python -m pip install numpy==1.23.5
+
 # Creates a non-root user with an explicit UID and adds permission to access the folder
 # For more info, please refer to https://aka.ms/vscode-docker-python-configure-containers
 # CHANGES HERE

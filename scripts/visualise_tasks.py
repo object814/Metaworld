@@ -22,7 +22,6 @@ from metaworld.policies.sawyer_assembly_v3_policy import SawyerAssemblyV3Policy 
 from metaworld.policies.sawyer_disassemble_v3_policy import SawyerDisassembleV3Policy as disassembly_policy
 
 from metaworld.policies.compo_draweropen_pickplace_policy import CompoDrawerOpenPickPlacePolicy
-from metaworld.policies.compo_assembly_disassembly_policy import CompoAssemblyDisassemblyPolicy
 from metaworld.policies.compo_dooropen_doorclose_policy import CompoDoorOpenDoorClosePolicy
 import argparse
 
@@ -32,19 +31,19 @@ def render_episode(env_name,
                    image_size=(480, 480),
                    action_policy="random",
                    camera_name=["topview", "front", "gripperPOV"],
-                   verbose=False):
+                   verbose=False,
+                   env_kwargs=None):
+    if env_kwargs is None:
+        env_kwargs = {}
     multiple_cameras = None
     if len(camera_name) == 1:
         camera_name = camera_name[0]
-        env = gym.make("Meta-World/MT1", env_name=env_name, render_mode="rgb_array", camera_name=camera_name)
+        env = gym.make("Meta-World/MT1", env_name=env_name, render_mode="rgb_array", camera_name=camera_name, **env_kwargs)
         env = ProprioImageObsWrapper(env,
                                      image_height=image_size[0],
                                      image_width=image_size[1])
         multiple_cameras = False
     elif len(camera_name) > 1:
-        env_kwargs = {}
-        if env_name == "pick-place-v3":
-            env_kwargs["initialise_region"] = "large"
         env = gym.make("Meta-World/MT1", env_name=env_name, render_mode="rgb_array", **env_kwargs)
         env = ProprioMultiImageObsWrapper(env,
                                           image_height=image_size[0],
@@ -146,11 +145,20 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Visualize Meta-World tasks")
     parser.add_argument("--tasks", nargs="+", required=True, help="Task names to visualize")
-    parser.add_argument("--agent", nargs="+", required=True, help="Agent type per task (policy/random)")
+    parser.add_argument("--agent", nargs="+", default=["policy"], help="Agent type per task (policy/random)")
     parser.add_argument("--length", type=int, nargs="+", help="Episode length per task")
     parser.add_argument("--camera-name", nargs="+", default=["topview", "front", "gripperPOV"], help="Camera names")
+    parser.add_argument("--env-kwargs", nargs="*", default=[], help="Extra env kwargs as key=value pairs (e.g. initialise_region=large)")
     
     args = parser.parse_args()
+    
+    # Parse env kwargs
+    env_kwargs = {}
+    for kv in args.env_kwargs:
+        if "=" not in kv:
+            parser.error(f"Invalid env kwarg format: {kv}. Expected key=value.")
+        k, v = kv.split("=", 1)
+        env_kwargs[k] = v
     
     # Handle defaults for length and agent
     if len(args.agent) == 1:
@@ -173,4 +181,5 @@ if __name__ == "__main__":
                        out_path=out_path,
                        episode_length=length,
                        action_policy=agent,
-                       camera_name=args.camera_name)
+                       camera_name=args.camera_name,
+                       env_kwargs=env_kwargs)

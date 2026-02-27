@@ -35,7 +35,7 @@ class SawyerAssemblyV3Policy(Policy):
     def _desired_pos(o_d: dict[str, npt.NDArray[np.float64]]) -> npt.NDArray[Any]:
         pos_curr = o_d["hand_pos"]
         pos_wrench = o_d["wrench_pos"] + np.array([-0.02, 0.0, 0.0])
-        pos_peg = o_d["peg_pos"] + np.array([0.12, 0.0, 0.14])
+        pos_peg = o_d["peg_pos"] + np.array([0.12, 0.0, 0.24])
 
         # If XY error is greater than 0.02, place end effector above the wrench
         if np.linalg.norm(pos_curr[:2] - pos_wrench[:2]) > 0.02:

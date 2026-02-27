@@ -116,6 +116,7 @@ def _make_tasks(
     args_kwargs: _env_dict.EnvArgsKwargsDict,
     kwargs_override: dict,
     seed: int | None = None,
+    env_init_kwargs: dict[str, Any] | None = None,
 ) -> list[Task]:
     """Initialises goals for a given set of environments.
 
@@ -124,6 +125,7 @@ def _make_tasks(
         args_kwargs: The environment arguments and keyword arguments.
         kwargs_override: Any kwarg overrides.
         seed: The random seed to use.
+        env_init_kwargs: Any custom kwargs to pass when initialising the environment.
 
     Returns:
         A flat list of `Task` objects, `_N_GOALS` for each environment in `classes`.
@@ -140,7 +142,7 @@ def _make_tasks(
         assert len(args["args"]) == 0
 
         # Init env
-        env = classes[env_name]()
+        env = classes[env_name](**(env_init_kwargs or {}))
         env._freeze_rand_vec = False
         env._set_task_called = True
         rand_vecs: list[npt.NDArray[Any]] = []
@@ -190,7 +192,7 @@ class MT1(Benchmark):
 
     ENV_NAMES = list(_env_dict.ALL_V3_ENVIRONMENTS.keys())
 
-    def __init__(self, env_name, seed=None):
+    def __init__(self, env_name, seed=None, custom_kwargs: dict[str, Any] | None = None):
         super().__init__()
         if env_name not in _env_dict.ALL_V3_ENVIRONMENTS:
             raise ValueError(f"{env_name} is not a V3 environment")
@@ -198,9 +200,13 @@ class MT1(Benchmark):
         self._train_classes = OrderedDict([(env_name, cls)])
         self._test_classes = OrderedDict([(env_name, cls)])
         args_kwargs = _env_dict.ML1_args_kwargs[env_name]
+        task_env_init_kwargs: dict[str, Any] = {}
+        # Handle any custom kwargs for initialising the env
+        if custom_kwargs is not None:
+            task_env_init_kwargs.update(custom_kwargs)
 
         self._train_tasks = _make_tasks(
-            self._train_classes, {env_name: args_kwargs}, _MT_OVERRIDE, seed=seed
+            self._train_classes, {env_name: args_kwargs}, _MT_OVERRIDE, seed=seed, env_init_kwargs=task_env_init_kwargs
         )
 
         self._test_tasks = []
@@ -416,15 +422,20 @@ def _init_each_env(
     camera_id: int | None = None,
     width: int = 480,
     height: int = 480,
+    custom_kwargs: dict[str, Any] | None = None,
 ) -> gym.Env:
-    env: gym.Env = env_cls(
-        reward_function_version=reward_function_version,
-        render_mode=render_mode,
-        camera_name=camera_name,
-        camera_id=camera_id,
-        width=width,
-        height=height,
-    )
+    env_init_kwargs: dict[str, Any] = {
+        "reward_function_version": reward_function_version,
+        "render_mode": render_mode,
+        "camera_name": camera_name,
+        "camera_id": camera_id,
+        "width": width,
+        "height": height,
+    }
+    if custom_kwargs is not None:
+        env_init_kwargs.update(custom_kwargs)
+
+    env: gym.Env = env_cls(**env_init_kwargs)
     if seed is not None:
         env.seed(seed)  # type: ignore
     env = gym.wrappers.TimeLimit(env, max_episode_steps or env.max_path_length)  # type: ignore
@@ -467,14 +478,30 @@ def make_mt_envs(
 ) -> gym.Env | gym.vector.VectorEnv:
     benchmark: Benchmark
     if name in ALL_V3_ENVIRONMENTS.keys():
-        benchmark = MT1(name, seed=seed)
+        # Separate kwargs for _init_each_env from env-specific custom kwargs
+        _INIT_EACH_ENV_PARAMS = {
+            'max_episode_steps', 'terminate_on_success', 'use_one_hot', 'env_id',
+            'num_tasks', 'recurrent_info_in_obs', 'normalize_reward_in_recurrent_info',
+            'task_select', 'reward_function_version', 'reward_normalization_method',
+            'normalize_observations', 'reward_alpha', 'render_mode', 'camera_name',
+            'camera_id', 'width', 'height', 'custom_kwargs',
+        }
+        init_env_kwargs = {k: v for k, v in kwargs.items() if k in _INIT_EACH_ENV_PARAMS}
+        env_custom_kwargs = {k: v for k, v in kwargs.items() if k not in _INIT_EACH_ENV_PARAMS}
+
+        # Merge any explicit custom_kwargs with auto-detected env-specific kwargs
+        custom_kwargs = init_env_kwargs.pop('custom_kwargs', None) or {}
+        custom_kwargs.update(env_custom_kwargs)
+
+        benchmark = MT1(name, seed=seed, custom_kwargs=custom_kwargs or None)
         tasks = [task for task in benchmark.train_tasks]
         return _init_each_env(  # type: ignore[misc]
             env_cls=benchmark.train_classes[name],
             tasks=tasks,
             seed=seed,
             num_tasks=num_tasks or 1,
-            **kwargs,
+            custom_kwargs=custom_kwargs or None,
+            **init_env_kwargs,
         )
     elif name == "MT10" or name == "MT25" or name == "MT50":
         benchmark = globals()[name](seed=seed)

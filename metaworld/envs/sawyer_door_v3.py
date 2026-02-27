@@ -85,7 +85,8 @@ class SawyerDoorEnvV3(SawyerXYZEnv):
             "grasp_reward": reward_grab,
             "in_place_reward": reward_success,
             "obj_to_target": 0,
-            "unscaled_reward": reward,
+            "unscaled_reward": reward * 5.0 + 5.0,  # Convert back to [0, 10] range for logging
+            "scaled_reward": reward,
         }
 
         return reward, info
@@ -201,6 +202,9 @@ class SawyerDoorEnvV3(SawyerXYZEnv):
                 reward = 10.0
 
             val1, val2 = reward_steps
+
+            # Normalise from [0, 10] to [-1, 1]
+            reward = (reward - 5.0) / 5.0
 
             return reward, reward_grab, val1, val2
         else:

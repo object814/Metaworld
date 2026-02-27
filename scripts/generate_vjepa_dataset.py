@@ -286,17 +286,54 @@ def parse_args():
     return p.parse_args()
 
 
+def _discover_existing_episode_dirs(output_dir: Path) -> list[Path]:
+    """Return existing episode directories sorted by numeric suffix."""
+    episode_dirs = []
+    for p in output_dir.iterdir():
+        if not p.is_dir() or not p.name.startswith("episode_"):
+            continue
+        suffix = p.name.split("episode_", 1)[1]
+        if suffix.isdigit():
+            episode_dirs.append(p)
+    episode_dirs.sort(key=lambda p: int(p.name.split("episode_", 1)[1]))
+    return episode_dirs
+
+
 def main():
     args = parse_args()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Discover existing episodes and rebuild/fill index CSV so interrupted runs
+    # can be resumed safely.
+    existing_episode_dirs = _discover_existing_episode_dirs(output_dir)
+    csv_path = output_dir / "episodes.csv"
+
+    all_episode_dirs: list[str] = [str(p.resolve()) for p in existing_episode_dirs]
+    with open(csv_path, "w") as f:
+        for d in all_episode_dirs:
+            f.write(d + "\n")
+
+    next_episode_idx = 0
+    if existing_episode_dirs:
+        next_episode_idx = int(existing_episode_dirs[-1].name.split("episode_", 1)[1]) + 1
+
     env, policy = _make_env_and_policy(args.env_name, args.image_size, seed=args.seed)
 
-    episode_dirs: list[str] = []
-    collected = 0
-    attempted = 0
+    collected = len(existing_episode_dirs)
+    attempted = len(existing_episode_dirs)
     t0 = time.time()
+
+    if collected > 0:
+        print(f"Found {collected} existing episodes in {output_dir}; resuming collection.")
+
+    if collected >= args.num_episodes:
+        env.close()
+        print(
+            f"Requested {args.num_episodes} episodes, but {collected} already exist. "
+            f"Index CSV has been rebuilt at {csv_path}."
+        )
+        return
 
     while collected < args.num_episodes:
         ep_seed = args.seed + attempted
@@ -309,11 +346,15 @@ def main():
         if args.only_successful and not episode_data["success"]:
             continue
 
-        ep_name = f"episode_{collected:05d}"
+        ep_name = f"episode_{next_episode_idx:05d}"
         ep_dir = output_dir / ep_name
         save_episode(episode_data, ep_dir, args.camera_names, args.fps)
-        episode_dirs.append(str(ep_dir.resolve()))
+        episode_path = str(ep_dir.resolve())
+        all_episode_dirs.append(episode_path)
+        with open(csv_path, "a") as f:
+            f.write(episode_path + "\n")
         collected += 1
+        next_episode_idx += 1
 
         elapsed = time.time() - t0
         rate = collected / elapsed if elapsed > 0 else 0
@@ -323,12 +364,6 @@ def main():
             f"len={episode_data['proprios'].shape[0]}  "
             f"({rate:.1f} ep/s)"
         )
-
-    # ── index CSV (one path per line, just like DROID) ───────────────────
-    csv_path = output_dir / "episodes.csv"
-    with open(csv_path, "w") as f:
-        for d in episode_dirs:
-            f.write(d + "\n")
 
     env.close()
     total = time.time() - t0

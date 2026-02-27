@@ -483,7 +483,7 @@ class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
         imgs = []
         for cam_id in self._camera_ids:
             self._renderer.update_scene(data, camera=cam_id)
-            img = self._renderer.render()
+            img = self._renderer.render().copy()
             imgs.append(img)
         imgs = np.concatenate(imgs, axis=2)  # (H,W,3*N)
         return imgs
@@ -501,6 +501,27 @@ class ProprioMultiImageObsWrapper(gym.ObservationWrapper):
 
         return {"proprio": proprio, "image": images, "original_obs": original_obs}
     
+    def render(self, camera_name: str | None = None):
+        """Override render to reuse the wrapper's own mujoco.Renderer.
+
+        This avoids creating a *second* GL context inside the base
+        MujocoEnv, which causes black-frame corruption under osmesa
+        after repeated env create/destroy cycles.
+
+        Args:
+            camera_name: If provided, render from this named camera.
+                         Otherwise use the free (default) camera.
+        """
+        if self.render_mode == "rgb_array":
+            data = self.env.unwrapped.data
+            if camera_name is not None:
+                cam_id = self._get_camera_id(camera_name)
+                self._renderer.update_scene(data, camera=cam_id)
+            else:
+                self._renderer.update_scene(data)
+            return self._renderer.render().copy()
+        return self.env.render()
+
     def close(self) -> None:
         try:
             self._renderer.close()

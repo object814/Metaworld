@@ -42,7 +42,10 @@ def render_episode(env_name,
                                      image_width=image_size[1])
         multiple_cameras = False
     elif len(camera_name) > 1:
-        env = gym.make("Meta-World/MT1", env_name=env_name, render_mode="rgb_array")
+        env_kwargs = {}
+        if env_name == "pick-place-v3":
+            env_kwargs["initialise_region"] = "large"
+        env = gym.make("Meta-World/MT1", env_name=env_name, render_mode="rgb_array", **env_kwargs)
         env = ProprioMultiImageObsWrapper(env,
                                           image_height=image_size[0],
                                           image_width=image_size[1],
@@ -70,8 +73,6 @@ def render_episode(env_name,
             policy = disassembly_policy()
         elif env_name == "compo-draweropen-pickplace":
             policy = CompoDrawerOpenPickPlacePolicy()
-        elif env_name == "compo-assembly-disassembly":
-            policy = CompoAssemblyDisassemblyPolicy()
         elif env_name == "compo-dooropen-doorclose":
             policy = CompoDoorOpenDoorClosePolicy()
         else:
@@ -88,7 +89,7 @@ def render_episode(env_name,
         elif action_policy == "policy":
             action = policy.get_action(obs["original_obs"])
         else:
-            action = np.array([0.02, -0.02, 0.01, 0.1]) # Simple hardcoded action for testing
+            action = np.array([0.2, -0.2, 0.1, 0.1]) # Simple hardcoded action for testing
         obs, reward, terminated, truncated, info = env.step(action)
         if verbose:
             print(f"EE Pos: {obs['proprio'][0]:.3f}, {obs['proprio'][1]:.3f}, {obs['proprio'][2]:.3f}, EE velocity: {obs['proprio'][3]:.3f}, {obs['proprio'][4]:.3f}, {obs['proprio'][5]:.3f}, Gripper Val: {obs['proprio'][6]:.3f}")
@@ -139,7 +140,6 @@ if __name__ == "__main__":
         "assembly": "assembly-v3",
         "disassemble": "disassemble-v3",
         "compo-draweropen-pickplace": "compo-draweropen-pickplace",
-        "compo-assembly-disassembly": "compo-assembly-disassembly",
         "compo-dooropen-doorclose": "compo-dooropen-doorclose",
         "compo-pickplace": "compo-pickplace",
     }
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     if len(args.agent) == 1:
         args.agent = args.agent * len(args.tasks)
     if args.length is None:
-        args.length = [500] * len(args.tasks)
+        args.length = [200] * len(args.tasks)
     elif len(args.length) == 1:
         args.length = args.length * len(args.tasks)
     

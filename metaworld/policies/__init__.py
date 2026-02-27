@@ -84,7 +84,6 @@ from metaworld.policies.sawyer_window_open_v3_policy import SawyerWindowOpenV3Po
 
 ENV_POLICY_MAP = dict(
     {
-        "compo-assembly-disassembly": CompoAssemblyDisassemblyPolicy,
         "compo-dooropen-doorclose": CompoDoorOpenDoorClosePolicy,
         "compo-draweropen-pickplace": CompoDrawerOpenPickPlacePolicy,
         "assembly-v3": SawyerAssemblyV3Policy,

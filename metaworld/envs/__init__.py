@@ -1,5 +1,4 @@
 # Compo tasks
-from metaworld.envs.compo_assembly_disassembly import CompoAssemblyDisassemblyEnv
 from metaworld.envs.compo_dooropen_doorclose import CompoDoorOpenDoorCloseEnv
 from metaworld.envs.compo_draweropen_pickplace import CompoDrawerOpenPickPlaceEnv
 from metaworld.envs.compo_handlepress_handlepressside import CompoHandlePressHandlePressSideEnv

@@ -1,6 +1,3 @@
-from metaworld.policies.compo_assembly_disassembly_policy import (
-    CompoAssemblyDisassemblyPolicy,
-)
 from metaworld.policies.compo_dooropen_doorclose_policy import (
     CompoDoorOpenDoorClosePolicy,
 )

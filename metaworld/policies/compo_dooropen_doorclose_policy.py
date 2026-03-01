@@ -82,16 +82,23 @@ class CompoDoorOpenDoorClosePolicy(Policy):
             )
             action["grab_effort"] = 1.0
 
-        # --- Transition: Raise gripper to clear the handle ------------
+        # --- Transition: Release handle, reposition to the right ------
         elif self._phase == "raise":
             pos_curr = o_d["hand_pos"]
             pos_door = o_d["door_pos"]
-            # Move straight up, well above the handle
-            target = np.array([pos_curr[0], pos_curr[1], pos_door[2] + 0.3])
+            # Move to the RIGHT side of the open handle, well above it.
+            # This mimics the starting position of the single-task
+            # door-close policy so the standard approach works cleanly.
+            target = np.array([
+                pos_door[0] + 0.25,   # to the right of the handle
+                pos_door[1] + 0.20,   # slightly forward
+                pos_door[2] + 0.35,   # well above the handle
+            ])
             action["delta_pos"] = move(pos_curr, target, p=10.0)
             action["grab_effort"] = -1.0  # release gripper
-            # Once the hand is sufficiently above the handle, proceed
-            if pos_curr[2] > pos_door[2] + 0.2:
+            # Transition once the hand is clearly to the right and above
+            if (pos_curr[0] > pos_door[0] + 0.15
+                    and pos_curr[2] > pos_door[2] + 0.25):
                 self._phase = "door_close"
 
         # --- Phase 2: Close the door ----------------------------------

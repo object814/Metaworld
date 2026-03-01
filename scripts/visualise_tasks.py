@@ -23,6 +23,7 @@ from metaworld.policies.sawyer_disassemble_v3_policy import SawyerDisassembleV3P
 
 from metaworld.policies.compo_draweropen_pickplace_policy import CompoDrawerOpenPickPlacePolicy
 from metaworld.policies.compo_dooropen_doorclose_policy import CompoDoorOpenDoorClosePolicy
+from metaworld.policies.compo_assembly_disassembly_policy import CompoAssemblyDisassemblyPolicy
 import argparse
 
 def render_episode(env_name,
@@ -74,6 +75,8 @@ def render_episode(env_name,
             policy = CompoDrawerOpenPickPlacePolicy()
         elif env_name == "compo-dooropen-doorclose":
             policy = CompoDoorOpenDoorClosePolicy()
+        elif env_name == "compo-assembly-disassembly":
+            policy = CompoAssemblyDisassemblyPolicy()
         else:
             raise NotImplementedError(f"Policy for {env_name} is not implemented.")
     
@@ -140,6 +143,7 @@ if __name__ == "__main__":
         "disassemble": "disassemble-v3",
         "compo-draweropen-pickplace": "compo-draweropen-pickplace",
         "compo-dooropen-doorclose": "compo-dooropen-doorclose",
+        "compo-assembly-disassembly": "compo-assembly-disassembly",
         "compo-pickplace": "compo-pickplace",
     }
     

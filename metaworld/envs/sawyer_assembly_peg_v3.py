@@ -29,8 +29,8 @@ class SawyerNutAssemblyEnvV3(SawyerXYZEnv):
         hand_high = (0.5, 1, 0.5)
         obj_low = (0, 0.6, 0.02)
         obj_high = (0, 0.6, 0.02)
-        goal_low = (-0.1, 0.75, 0.1)
-        goal_high = (0.1, 0.85, 0.1)
+        goal_low = (-0.1, 0.75, 0.02)
+        goal_high = (0.1, 0.85, 0.02)
 
         super().__init__(
             hand_low=hand_low,
@@ -95,7 +95,8 @@ class SawyerNutAssemblyEnvV3(SawyerXYZEnv):
         assert isinstance(
             self._target_pos, np.ndarray
         ), "`reset_model()` must be called before `_target_site_config` is accessed."
-        return [("pegTop", self._target_pos)]
+        # return [("pegTop", self._target_pos)]
+        return [("pegBottom", self._target_pos)]
 
     def _get_id_main_object(self) -> int:
         """TODO: Reggie"""
@@ -119,10 +120,12 @@ class SawyerNutAssemblyEnvV3(SawyerXYZEnv):
             goal_pos = self._get_state_rand_vec()
         self.obj_init_pos = goal_pos[:3]
         self._target_pos = goal_pos[-3:]
-        peg_pos = self._target_pos - np.array([0.0, 0.0, 0.05])
+        # peg_pos = self._target_pos - np.array([0.0, 0.0, 0.05]) 
+        peg_pos = self._target_pos + np.array([0.0, 0.0, 0.05])
         self._set_obj_xyz(self.obj_init_pos)
         self.model.body("peg").pos = peg_pos
-        self.model.site("pegTop").pos = self._target_pos
+        # self.model.site("pegTop").pos = self._target_pos
+        self.model.site("pegBottom").pos = self._target_pos
 
         if self.reward_function_version == "v1":
             self.obj_height = self.data.site_xpos[

@@ -37,17 +37,20 @@ class SawyerDisassembleV3Policy(Policy):
     def _desired_pos(o_d: dict[str, npt.NDArray[np.float64]]) -> npt.NDArray[Any]:
         pos_curr = o_d["hand_pos"]
         pos_wrench = o_d["wrench_pos"] + np.array([-0.02, 0.0, 0.01])
-        # pos_peg = o_d["peg_pos"] + np.array([0.12, 0.0, 0.14])
+        gripper = o_d["gripper"]
 
         # If XY error is greater than 0.02, place end effector above the wrench
         if np.linalg.norm(pos_curr[:2] - pos_wrench[:2]) > 0.02:
             return pos_wrench + np.array([0.0, 0.0, 0.1])
         # Once XY error is low enough, drop end effector down on top of wrench
-        elif abs(pos_curr[2] - pos_wrench[2]) > 0.03:
+        elif abs(pos_curr[2] - pos_wrench[2]) > 0.05:
             return pos_wrench
-        # Move upwards
+        # Wait for gripper to close around wrench before lifting
+        elif gripper > 0.7:
+            return pos_wrench
+        # Gripper closed, move upwards (wrench-relative target avoids oscillation)
         else:
-            return pos_curr + np.array([0.0, 0.0, 0.1])
+            return pos_wrench + np.array([0.0, 0.0, 0.3])
 
     @staticmethod
     def _grab_effort(o_d: dict[str, npt.NDArray[np.float64]]) -> float:
@@ -56,7 +59,7 @@ class SawyerDisassembleV3Policy(Policy):
 
         if (
             np.linalg.norm(pos_curr[:2] - pos_wrench[:2]) > 0.02
-            or abs(pos_curr[2] - pos_wrench[2]) > 0.07
+            or abs(pos_curr[2] - pos_wrench[2]) > 0.1
         ):
             return 0.0
         else:

@@ -20,12 +20,13 @@ Dataset layout (mirrors DROID):
         ...
 
 Usage:
-    python scripts/generate_metaworld_dataset.py \
+    python scripts/generate_vjepa_dataset.py \
         --num_episodes 100 \
         --episode_length 150 \
         --output_dir datasets/metaworld_pickplace \
         --env_name pick-place-v3 \
         --camera_names topview front gripperPOV \
+        --policy-type expert \
         --image_size 224 \
         --fps 15 \
         --seed 42
@@ -44,6 +45,7 @@ import cv2
 import gymnasium as gym
 import h5py
 import numpy as np
+from tqdm import tqdm
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
@@ -95,8 +97,13 @@ def _get_camera_extrinsics(env: gym.Env, camera_name: str) -> np.ndarray:
     return np.concatenate([pos, quat])             # (7,)
 
 
-def _make_env_and_policy(env_name: str, image_size: int, seed: int | None = None):
-    """Create a Metaworld env (single-cam, rgb_array) and its scripted policy."""
+def _make_env_and_policy(
+    env_name: str,
+    image_size: int,
+    seed: int | None = None,
+    policy_type: str = "expert",
+):
+    """Create a Metaworld env (single-cam, rgb_array) and optional scripted policy."""
     # We render with a dummy single camera; actual multi-cam frames are grabbed manually.
     env = gym.make(
         "Meta-World/MT1",
@@ -106,13 +113,20 @@ def _make_env_and_policy(env_name: str, image_size: int, seed: int | None = None
     )
     if seed is not None:
         env.reset(seed=seed)
-    policy_cls = ENV_TO_POLICY.get(env_name)
-    if policy_cls is None:
-        raise NotImplementedError(
-            f"No scripted policy for '{env_name}'. "
-            f"Available: {list(ENV_TO_POLICY.keys())}"
-        )
-    return env, policy_cls()
+
+    if policy_type == "expert":
+        policy_cls = ENV_TO_POLICY.get(env_name)
+        if policy_cls is None:
+            raise NotImplementedError(
+                f"No scripted policy for '{env_name}'. "
+                f"Available: {list(ENV_TO_POLICY.keys())}"
+            )
+        return env, policy_cls()
+
+    if policy_type == "random":
+        return env, None
+
+    raise ValueError(f"Unknown policy type '{policy_type}'. Expected 'expert' or 'random'.")
 
 
 def _render_camera(env: gym.Env, camera_name: str, height: int, width: int) -> np.ndarray:
@@ -147,6 +161,7 @@ def collect_episode(
     episode_length: int,
     camera_names: list[str],
     image_size: int,
+    policy_type: str = "expert",
     seed: int | None = None,
 ) -> dict:
     """Roll out one episode.  Returns a dict of arrays."""
@@ -175,7 +190,13 @@ def collect_episode(
         extrinsics[cam].append(_get_camera_extrinsics(env, cam))
 
     for t in range(episode_length):
-        action = policy.get_action(original_obs)
+        if policy_type == "expert":
+            action = policy.get_action(original_obs)
+        elif policy_type == "random":
+            action = env.action_space.sample()
+        else:
+            raise ValueError(f"Unknown policy type '{policy_type}'.")
+
         obs_raw, reward, terminated, truncated, info = env.step(action)
 
         hand_pos = obs_raw[:3].astype(np.float32)
@@ -275,6 +296,8 @@ def parse_args():
                    help="Metaworld environment name.")
     p.add_argument("--camera-names", nargs="+", default=["topview", "front", "gripperPOV"],
                    help="Camera names to render.")
+    p.add_argument("--policy-type", type=str, choices=["expert", "random"], default="expert",
+                   help="Policy to use for rollout: scripted expert or random actions.")
     p.add_argument("--image-size", type=int, default=224,
                    help="Height and width of rendered frames.")
     p.add_argument("--fps", type=int, default=15,
@@ -318,7 +341,12 @@ def main():
     if existing_episode_dirs:
         next_episode_idx = int(existing_episode_dirs[-1].name.split("episode_", 1)[1]) + 1
 
-    env, policy = _make_env_and_policy(args.env_name, args.image_size, seed=args.seed)
+    env, policy = _make_env_and_policy(
+        args.env_name,
+        args.image_size,
+        seed=args.seed,
+        policy_type=args.policy_type,
+    )
 
     collected = len(existing_episode_dirs)
     attempted = len(existing_episode_dirs)
@@ -335,35 +363,48 @@ def main():
         )
         return
 
-    while collected < args.num_episodes:
-        ep_seed = args.seed + attempted
-        attempted += 1
+    with tqdm(
+        total=args.num_episodes,
+        initial=collected,
+        desc="Collecting episodes",
+        unit="ep",
+    ) as pbar:
+        while collected < args.num_episodes:
+            ep_seed = args.seed + attempted
+            attempted += 1
 
-        episode_data = collect_episode(
-            env, policy, args.episode_length, args.camera_names, args.image_size, seed=ep_seed
-        )
+            episode_data = collect_episode(
+                env,
+                policy,
+                args.episode_length,
+                args.camera_names,
+                args.image_size,
+                policy_type=args.policy_type,
+                seed=ep_seed,
+            )
 
-        if args.only_successful and not episode_data["success"]:
-            continue
+            if args.only_successful and not episode_data["success"]:
+                continue
 
-        ep_name = f"episode_{next_episode_idx:05d}"
-        ep_dir = output_dir / ep_name
-        save_episode(episode_data, ep_dir, args.camera_names, args.fps)
-        episode_path = str(ep_dir.resolve())
-        all_episode_dirs.append(episode_path)
-        with open(csv_path, "a") as f:
-            f.write(episode_path + "\n")
-        collected += 1
-        next_episode_idx += 1
+            ep_name = f"episode_{next_episode_idx:05d}"
+            ep_dir = output_dir / ep_name
+            save_episode(episode_data, ep_dir, args.camera_names, args.fps)
+            episode_path = str(ep_dir.resolve())
+            all_episode_dirs.append(episode_path)
+            with open(csv_path, "a") as f:
+                f.write(episode_path + "\n")
+            collected += 1
+            next_episode_idx += 1
 
-        elapsed = time.time() - t0
-        rate = collected / elapsed if elapsed > 0 else 0
-        print(
-            f"[{collected}/{args.num_episodes}] saved {ep_name}  "
-            f"success={episode_data['success']}  "
-            f"len={episode_data['proprios'].shape[0]}  "
-            f"({rate:.1f} ep/s)"
-        )
+            elapsed = time.time() - t0
+            rate = collected / elapsed if elapsed > 0 else 0
+            pbar.update(1)
+            pbar.set_postfix(
+                saved=ep_name,
+                success=episode_data["success"],
+                length=episode_data["proprios"].shape[0],
+                rate=f"{rate:.1f} ep/s",
+            )
 
     env.close()
     total = time.time() - t0

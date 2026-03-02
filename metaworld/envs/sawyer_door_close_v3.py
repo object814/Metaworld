@@ -154,6 +154,9 @@ class SawyerDoorCloseEnvV3(SawyerXYZEnv):
             if obj_to_target < _TARGET_RADIUS:
                 reward = 10
 
+            # Normalise from [0, 10] to [-1, 1]
+            reward = (reward - 5.0) / 5.0
+
             return (reward, obj_to_target, hand_in_place)
         else:
             del actions

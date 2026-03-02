@@ -216,6 +216,9 @@ class SawyerNutDisassembleEnvV3(SawyerXYZEnv):
             if success:
                 reward = 10.0
 
+            # Normalise from [0, 10] to [-1, 1]
+            reward = (reward - 5.0) / 5.0
+
             return (
                 reward,
                 reward_grab,

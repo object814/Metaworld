@@ -27,8 +27,8 @@ class SawyerNutDisassembleEnvV3(SawyerXYZEnv):
     ) -> None:
         hand_low = (-0.5, 0.40, 0.05)
         hand_high = (0.5, 1, 0.5)
-        obj_low = (0.0, 0.6, 0.025)
-        obj_high = (0.1, 0.75, 0.02501)
+        obj_low = (-0.25, 0.40, 0.025)
+        obj_high = (0.15, 0.60, 0.02501)
         goal_low = (-0.1, 0.6, 0.1699)
         goal_high = (0.1, 0.75, 0.1701)
 
@@ -161,19 +161,26 @@ class SawyerNutDisassembleEnvV3(SawyerXYZEnv):
     def _reward_pos(
         wrench_center: npt.NDArray[Any], target_pos: npt.NDArray[Any]
     ) -> float:
-        pos_error = target_pos + np.array([0.0, 0.0, 0.1]) - wrench_center
+        pos_error = target_pos - wrench_center
 
-        a = 0.1  # Relative importance of just *trying* to lift the wrench
-        b = 0.9  # Relative importance of placing the wrench on the peg
-        lifted = wrench_center[2] > 0.02
-        in_place = a * float(lifted) + b * reward_utils.tolerance(
+        # Smooth lift progress from table height to target z
+        z_floor = 0.02
+        z_range = max(target_pos[2] - z_floor, 0.01)
+        lift_progress = float(
+            np.clip((wrench_center[2] - z_floor) / z_range, 0.0, 1.0)
+        )
+
+        # 3D distance to target — larger margin for smooth gradient
+        in_place = reward_utils.tolerance(
             float(np.linalg.norm(pos_error)),
             bounds=(0, 0.02),
-            margin=0.2,
+            margin=0.4,
             sigmoid="long_tail",
         )
 
-        return in_place
+        a = 0.3  # lift progress (provides early gradient)
+        b = 0.7  # precision near target
+        return a * lift_progress + b * in_place
 
     def compute_reward(
         self, actions: npt.NDArray[Any], obs: npt.NDArray[np.float64]
@@ -204,13 +211,13 @@ class SawyerNutDisassembleEnvV3(SawyerXYZEnv):
                 obj_radius=0.015,
                 pad_success_thresh=0.02,
                 xz_thresh=0.01,
-                high_density=True,
+                medium_density=True,
             )
             reward_in_place = SawyerNutDisassembleEnvV3._reward_pos(
                 wrench_center, self._target_pos
             )
 
-            reward = (2.0 * reward_grab + 6.0 * reward_in_place) * reward_quat
+            reward = (2.0 * reward_grab + 8.0 * reward_in_place) * reward_quat
             # Override reward on success
             success = obs[6] > self._target_pos[2]
             if success:

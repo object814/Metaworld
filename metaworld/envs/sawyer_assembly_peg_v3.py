@@ -15,6 +15,12 @@ from metaworld.utils.reward_utils import tolerance
 
 class SawyerNutAssemblyEnvV3(SawyerXYZEnv):
     WRENCH_HANDLE_LENGTH: float = 0.02
+    INSERTED_Z_OFFSET: float = 0.01
+    INSERTED_Z_TOLERANCE: float = 0.012
+    # Minimum XY distance between nut and peg to avoid overlap
+    MIN_OBJ_PEG_XY_DIST: float = 0.15
+    # Maximum attempts to sample non-colliding positions
+    MAX_RESET_RETRIES: int = 50
 
     def __init__(
         self,
@@ -27,11 +33,11 @@ class SawyerNutAssemblyEnvV3(SawyerXYZEnv):
     ) -> None:
         hand_low = (-0.5, 0.40, 0.05)
         hand_high = (0.5, 1, 0.5)
-        obj_low = (0, 0.6, 0.02)
-        obj_high = (0, 0.6, 0.02)
-        goal_low = (-0.1, 0.75, 0.02)
-        goal_high = (0.1, 0.85, 0.02)
-
+        obj_low = (-0.35, 0.45, 0.02)
+        obj_high = (0.15, 0.75, 0.02)
+        goal_low = (-0.25, 0.40, 0.02)
+        goal_high = (0.15, 0.60, 0.02)
+        
         super().__init__(
             hand_low=hand_low,
             hand_high=hand_high,
@@ -95,7 +101,6 @@ class SawyerNutAssemblyEnvV3(SawyerXYZEnv):
         assert isinstance(
             self._target_pos, np.ndarray
         ), "`reset_model()` must be called before `_target_site_config` is accessed."
-        # return [("pegTop", self._target_pos)]
         return [("pegBottom", self._target_pos)]
 
     def _get_id_main_object(self) -> int:
@@ -113,19 +118,75 @@ class SawyerNutAssemblyEnvV3(SawyerXYZEnv):
         obs_dict["state_achieved_goal"] = self.get_body_com("RoundNut")
         return obs_dict
 
+    def _objects_overlap(self) -> bool:
+        """Check if the nut and peg overlap after forward kinematics.
+
+        Runs mj_forward and inspects MuJoCo contacts. Returns True if any
+        contact involves both a peg geom and a RoundNut/Wrench geom.
+        """
+        mujoco.mj_forward(self.model, self.data)
+
+        peg_geom_ids: set[int] = set()
+        nut_geom_ids: set[int] = set()
+        for i in range(self.model.ngeom):
+            name = mujoco.mj_id2name(
+                self.model, mujoco.mjtObj.mjOBJ_GEOM, i
+            )
+            if name is None:
+                continue
+            if "peg" in name.lower():
+                peg_geom_ids.add(i)
+            elif "roundnut" in name.lower() or "wrench" in name.lower():
+                nut_geom_ids.add(i)
+
+        for j in range(self.data.ncon):
+            c = self.data.contact[j]
+            g1, g2 = int(c.geom1), int(c.geom2)
+            if (g1 in peg_geom_ids and g2 in nut_geom_ids) or (
+                g2 in peg_geom_ids and g1 in nut_geom_ids
+            ):
+                return True
+
+        # Also check raw XY distance as a fallback
+        nut_pos = self.data.site("RoundNut-8").xpos
+        peg_bottom = self.model.site("pegBottom").pos.copy()
+        if np.linalg.norm(nut_pos[:2] - peg_bottom[:2]) < self.MIN_OBJ_PEG_XY_DIST:
+            return True
+
+        return False
+
     def reset_model(self) -> npt.NDArray[np.float64]:
         self._reset_hand()
-        goal_pos = self._get_state_rand_vec()
-        while np.linalg.norm(goal_pos[:2] - goal_pos[-3:-1]) < 0.1:
+
+        for _ in range(self.MAX_RESET_RETRIES):
             goal_pos = self._get_state_rand_vec()
-        self.obj_init_pos = goal_pos[:3]
-        self._target_pos = goal_pos[-3:]
-        # peg_pos = self._target_pos - np.array([0.0, 0.0, 0.05]) 
-        peg_pos = self._target_pos + np.array([0.0, 0.0, 0.05])
-        self._set_obj_xyz(self.obj_init_pos)
-        self.model.body("peg").pos = peg_pos
-        # self.model.site("pegTop").pos = self._target_pos
-        self.model.site("pegBottom").pos = self._target_pos
+            # Quick pre-check: XY distance between nut and peg
+            if (
+                np.linalg.norm(goal_pos[:2] - goal_pos[-3:-1])
+                < self.MIN_OBJ_PEG_XY_DIST
+            ):
+                continue
+
+            self.obj_init_pos = goal_pos[:3]
+            self._target_pos = goal_pos[-3:]
+            peg_pos = self._target_pos + np.array([0.0, 0.0, 0.05])
+            self._set_obj_xyz(self.obj_init_pos)
+            self.model.body("peg").pos = peg_pos
+            self.model.site("pegBottom").pos = self._target_pos
+
+            # Run forward kinematics and check for collisions
+            if not self._objects_overlap():
+                break
+        else:
+            # Exhausted retries — keep the last sampled positions and warn
+            import warnings
+
+            warnings.warn(
+                "SawyerNutAssemblyEnvV3: Could not find non-overlapping "
+                f"positions after {self.MAX_RESET_RETRIES} attempts. "
+                "Using last sampled positions.",
+                stacklevel=2,
+            )
 
         if self.reward_function_version == "v1":
             self.obj_height = self.data.site_xpos[
@@ -163,17 +224,25 @@ class SawyerNutAssemblyEnvV3(SawyerXYZEnv):
         radius = np.linalg.norm(pos_error[:2])
 
         aligned = radius < 0.02
-        hooked = pos_error[2] > 0.0
-        success = bool(aligned and hooked)
+        inserted_z = target_pos[2] + SawyerNutAssemblyEnvV3.INSERTED_Z_OFFSET
+        seated = (
+            abs(wrench_center[2] - inserted_z)
+            < SawyerNutAssemblyEnvV3.INSERTED_Z_TOLERANCE
+        )
+        success = bool(aligned and seated)
 
         # Target height is a 3D funnel centered on the peg.
         # use the success flag to widen the bottleneck once the agent
         # learns to place the wrench on the peg -- no reason to encourage
         # tons of alignment accuracy if task is already solved
         threshold = 0.02 if success else 0.01
-        target_height = 0.0
+        target_height = inserted_z
         if radius > threshold:
-            target_height = 0.02 * np.log(radius - threshold) + 0.2
+            target_height = (
+                0.02 * np.log(radius - threshold)
+                + target_pos[2]
+                + 0.2
+            )
 
         pos_error[2] = target_height - wrench_center[2]
 

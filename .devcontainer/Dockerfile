@@ -47,9 +47,9 @@ RUN apt-get update && \
         libxrender1 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install git
+# Install git and tmux
 RUN apt-get update && \
-    apt-get install -y git
+    apt-get install -y git tmux
 # CHANGE to your desired workspace name
 RUN git config --global --add safe.directory /Metaworld
 

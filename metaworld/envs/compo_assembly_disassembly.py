@@ -35,6 +35,8 @@ class CompoAssemblyDisassemblyEnv(SawyerXYZEnv):
     """
 
     WRENCH_HANDLE_LENGTH: float = 0.02
+    INSERTED_Z_OFFSET: float = 0.01
+    INSERTED_Z_TOLERANCE: float = 0.012
 
     def __init__(
         self,
@@ -47,12 +49,10 @@ class CompoAssemblyDisassemblyEnv(SawyerXYZEnv):
     ) -> None:
         hand_low = (-0.5, 0.40, 0.05)
         hand_high = (0.5, 1, 0.5)
-        obj_low = (0.0, 0.6, 0.025)
-        obj_high = (0.1, 0.75, 0.02501)
-        # Goal space must cover both disassembly target (Z ~ 0.175)
-        # and assembly target (Z ~ 0.025)
-        goal_low = (-0.1, 0.6, 0.02)
-        goal_high = (0.1, 0.75, 0.20)
+        obj_low = (-0.35, 0.45, 0.02)
+        obj_high = (0.15, 0.75, 0.02)
+        goal_low = (-0.25, 0.40, 0.02)
+        goal_high = (0.15, 0.60, 0.02)
 
         # Task-specific flags
         self.disassembled = False
@@ -112,6 +112,8 @@ class CompoAssemblyDisassemblyEnv(SawyerXYZEnv):
         assert (
             self._target_pos is not None
         ), "`reset_model()` must be called before `_target_site_config`."
+        if not self.assembled:
+            return [("pegBottom", self._target_pos)]
         return [("pegTop", self._target_pos)]
 
     def _get_id_main_object(self) -> int:
@@ -132,6 +134,48 @@ class CompoAssemblyDisassemblyEnv(SawyerXYZEnv):
     # Reset
     # ------------------------------------------------------------------
 
+    # Minimum XY distance between nut and peg to avoid overlap
+    MIN_OBJ_PEG_XY_DIST: float = 0.15
+    # Maximum attempts to sample non-colliding positions
+    MAX_RESET_RETRIES: int = 50
+
+    def _objects_overlap(self) -> bool:
+        """Check if the nut and peg overlap after forward kinematics.
+
+        Runs mj_forward and inspects MuJoCo contacts. Returns True if any
+        contact involves both a peg geom and a RoundNut/Wrench geom.
+        """
+        mujoco.mj_forward(self.model, self.data)
+
+        peg_geom_ids: set[int] = set()
+        nut_geom_ids: set[int] = set()
+        for i in range(self.model.ngeom):
+            name = mujoco.mj_id2name(
+                self.model, mujoco.mjtObj.mjOBJ_GEOM, i
+            )
+            if name is None:
+                continue
+            if "peg" in name.lower():
+                peg_geom_ids.add(i)
+            elif "roundnut" in name.lower() or "wrench" in name.lower():
+                nut_geom_ids.add(i)
+
+        for j in range(self.data.ncon):
+            c = self.data.contact[j]
+            g1, g2 = int(c.geom1), int(c.geom2)
+            if (g1 in peg_geom_ids and g2 in nut_geom_ids) or (
+                g2 in peg_geom_ids and g1 in nut_geom_ids
+            ):
+                return True
+
+        # Also check raw XY distance as a fallback
+        nut_pos = self._get_site_pos("RoundNut-8")
+        peg_bottom = self.model.site("pegBottom").pos.copy()
+        if np.linalg.norm(nut_pos[:2] - peg_bottom[:2]) < self.MIN_OBJ_PEG_XY_DIST:
+            return True
+
+        return False
+
     def reset_model(self) -> npt.NDArray[np.float64]:
         self._reset_hand()
 
@@ -142,32 +186,52 @@ class CompoAssemblyDisassemblyEnv(SawyerXYZEnv):
         self.obj_init_pos = np.array(self.init_config["obj_init_pos"])
         self.obj_init_angle = self.init_config["obj_init_angle"]
 
-        # Randomise positions: nut on peg (disassembly start)
-        goal_pos = self._get_state_rand_vec()
-        while np.linalg.norm(goal_pos[:2] - goal_pos[-3:-1]) < 0.1:
+        for _ in range(self.MAX_RESET_RETRIES):
+            # Randomise positions: nut on table, separate from peg
             goal_pos = self._get_state_rand_vec()
-        self.obj_init_pos = goal_pos[:3]
+            # Quick pre-check: XY distance between nut and peg
+            if (
+                np.linalg.norm(goal_pos[:2] - goal_pos[-3:-1])
+                < self.MIN_OBJ_PEG_XY_DIST
+            ):
+                continue
 
-        # Phase 1 target: above the peg (disassemble — lift nut off)
-        self._disassemble_target_pos = self.obj_init_pos + np.array([0, 0, 0.15])
+            self.obj_init_pos = goal_pos[:3]
 
-        # Phase 2 target: bottom of the peg (assemble — place nut back on)
-        # This is the peg bottom position (same as assembly env uses)
-        self._assemble_target_pos = self.obj_init_pos.copy()
+            # Phase 1 target: bottom of peg (assemble)
+            self._assemble_target_pos = goal_pos[-3:].copy()
+            # Phase 2 target: above peg (disassemble)
+            self._disassemble_target_pos = (
+                self._assemble_target_pos + np.array([0.0, 0.0, 0.15])
+            )
 
-        # Start with Phase 1 target
-        self._target_pos = self._disassemble_target_pos.copy()
+            # Start with Phase 1 target
+            self._target_pos = self._assemble_target_pos.copy()
 
-        # Set peg position (nut starts on the peg)
-        peg_pos = self.obj_init_pos + np.array([0.0, 0.0, 0.03])
-        peg_top_pos = self.obj_init_pos + np.array([0.0, 0.0, 0.08])
-        self.model.body("peg").pos = peg_pos
-        self.model.site("pegTop").pos = peg_top_pos
-        # pegBottom is at -0.05 from peg body center, so it sits at obj_init_pos - 0.02
-        self.model.site("pegBottom").pos = self._assemble_target_pos
+            # Set peg position from assembly target (same convention as assembly env)
+            peg_pos = self._assemble_target_pos + np.array([0.0, 0.0, 0.05])
+            self.model.body("peg").pos = peg_pos
+            self.model.site("pegBottom").pos = self._assemble_target_pos
+            self.model.site("pegTop").pos = (
+                self._assemble_target_pos + np.array([0.0, 0.0, 0.1])
+            )
+            self._set_obj_xyz(self.obj_init_pos)
+
+            # Run forward kinematics and check for collisions
+            if not self._objects_overlap():
+                break
+        else:
+            # Exhausted retries — keep the last sampled positions and warn
+            import warnings
+
+            warnings.warn(
+                "CompoAssemblyDisassemblyEnv: Could not find non-overlapping "
+                f"positions after {self.MAX_RESET_RETRIES} attempts. "
+                "Using last sampled positions.",
+                stacklevel=2,
+            )
+
         mujoco.mj_forward(self.model, self.data)
-        self._set_obj_xyz(self.obj_init_pos)
-
         return self._get_obs()
 
     # ------------------------------------------------------------------
@@ -186,19 +250,26 @@ class CompoAssemblyDisassemblyEnv(SawyerXYZEnv):
         wrench_center: npt.NDArray[Any], target_pos: npt.NDArray[Any]
     ) -> float:
         """Position reward for disassembly (from SawyerNutDisassembleEnvV3)."""
-        pos_error = target_pos + np.array([0.0, 0.0, 0.1]) - wrench_center
+        pos_error = target_pos - wrench_center
 
-        a = 0.1  # Relative importance of just *trying* to lift the wrench
-        b = 0.9  # Relative importance of placing the wrench on the peg
-        lifted = wrench_center[2] > 0.02
-        in_place = a * float(lifted) + b * reward_utils.tolerance(
+        # Smooth lift progress from table height to target z
+        z_floor = 0.02
+        z_range = max(target_pos[2] - z_floor, 0.01)
+        lift_progress = float(
+            np.clip((wrench_center[2] - z_floor) / z_range, 0.0, 1.0)
+        )
+
+        # 3D distance to target — larger margin for smooth gradient
+        in_place = reward_utils.tolerance(
             float(np.linalg.norm(pos_error)),
             bounds=(0, 0.02),
-            margin=0.2,
+            margin=0.4,
             sigmoid="long_tail",
         )
 
-        return in_place
+        a = 0.3  # lift progress (provides early gradient)
+        b = 0.7  # precision near target
+        return a * lift_progress + b * in_place
 
     @staticmethod
     def _reward_pos_assemble(
@@ -210,13 +281,21 @@ class CompoAssemblyDisassemblyEnv(SawyerXYZEnv):
         radius = np.linalg.norm(pos_error[:2])
 
         aligned = radius < 0.02
-        hooked = pos_error[2] > 0.0
-        success = bool(aligned and hooked)
+        inserted_z = target_pos[2] + CompoAssemblyDisassemblyEnv.INSERTED_Z_OFFSET
+        seated = (
+            abs(wrench_center[2] - inserted_z)
+            < CompoAssemblyDisassemblyEnv.INSERTED_Z_TOLERANCE
+        )
+        success = bool(aligned and seated)
 
         threshold = 0.02 if success else 0.01
-        target_height = 0.0
+        target_height = inserted_z
         if radius > threshold:
-            target_height = 0.02 * np.log(radius - threshold) + 0.2
+            target_height = (
+                0.02 * np.log(radius - threshold)
+                + target_pos[2]
+                + 0.2
+            )
 
         pos_error[2] = target_height - wrench_center[2]
 
@@ -262,26 +341,39 @@ class CompoAssemblyDisassemblyEnv(SawyerXYZEnv):
             obj_radius=0.015,
             pad_success_thresh=0.02,
             xz_thresh=0.01,
-            high_density=True,
+            medium_density=True,
         )
 
         # =============================================================
-        # PHASE 1 — DISASSEMBLE (lift nut off peg)
+        # PHASE 1 — ASSEMBLE (place nut onto peg)
         # =============================================================
-        if not self.disassembled:
-            reward_in_place = CompoAssemblyDisassemblyEnv._reward_pos_disassemble(
-                wrench_center, self._disassemble_target_pos
+        if not self.assembled:
+            # Explicit approach reward — smooth gradient as gripper nears object
+            tcp_to_wrench = float(np.linalg.norm(hand - wrench))
+            reward_reach = reward_utils.tolerance(
+                tcp_to_wrench,
+                bounds=(0, 0.02),
+                margin=0.25,
+                sigmoid="long_tail",
             )
 
-            reward = (2.0 * reward_grab + 6.0 * reward_in_place) * reward_quat
+            reward_in_place, assemble_success = (
+                CompoAssemblyDisassemblyEnv._reward_pos_assemble(
+                    wrench_center, self._assemble_target_pos
+                )
+            )
 
-            # Check disassemble success: nut Z > target Z
-            disassemble_success = obs[6] > self._disassemble_target_pos[2]
-            if disassemble_success:
+            reward = (
+                2.0 * reward_reach
+                + 2.0 * reward_grab
+                + 6.0 * reward_in_place
+            ) * reward_quat
+
+            if assemble_success:
                 reward = 10.0
-                self.disassembled = True
-                # Transition to Phase 2: update target to assembly position
-                self._target_pos = self._assemble_target_pos.copy()
+                self.assembled = True
+                # Transition to Phase 2: update target to disassembly position
+                self._target_pos = self._disassemble_target_pos.copy()
 
             # Combined task range [0, 20] → normalise to [-1, 1]
             reward = (reward - 10.0) / 10.0
@@ -291,25 +383,24 @@ class CompoAssemblyDisassemblyEnv(SawyerXYZEnv):
                 reward_grab,
                 reward_quat,
                 reward_in_place,
-                float(disassemble_success),
-                0.0,  # assemble_success placeholder
+                0.0,  # disassemble_success placeholder
+                float(assemble_success),
             )
 
         # =============================================================
-        # PHASE 2 — ASSEMBLE (place nut onto peg)
+        # PHASE 2 — DISASSEMBLE (lift nut off peg)
         # =============================================================
         else:
-            reward_in_place, assemble_success = (
-                CompoAssemblyDisassemblyEnv._reward_pos_assemble(
-                    wrench_center, self._assemble_target_pos
-                )
+            reward_in_place = CompoAssemblyDisassemblyEnv._reward_pos_disassemble(
+                wrench_center, self._disassemble_target_pos
             )
 
-            reward = (2.0 * reward_grab + 6.0 * reward_in_place) * reward_quat
+            reward = (2.0 * reward_grab + 8.0 * reward_in_place) * reward_quat
 
-            if assemble_success:
+            disassemble_success = obs[6] > self._disassemble_target_pos[2]
+            if disassemble_success:
                 reward = 10.0
-                self.assembled = True
+                self.disassembled = True
 
             # +10 offset for having completed Phase 1
             reward += 10.0
@@ -322,8 +413,8 @@ class CompoAssemblyDisassemblyEnv(SawyerXYZEnv):
                 reward_grab,
                 reward_quat,
                 reward_in_place,
-                1.0,  # disassemble already done
-                float(assemble_success),
+                float(disassemble_success),
+                1.0,  # assemble already done
             )
 
     # ------------------------------------------------------------------

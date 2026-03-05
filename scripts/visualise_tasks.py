@@ -84,8 +84,9 @@ def render_episode(env_name,
     time_stamp = time.time()
 
     obs, info = env.reset()
+    reward = 0.0
     for t in range(episode_length):
-        print(f"Step {t+1}/{episode_length}")
+        print(f"Step {t+1}/{episode_length} | Reward: {reward:.2f}")
         if action_policy == "random":
             action = env.action_space.sample()
         elif action_policy == "policy":

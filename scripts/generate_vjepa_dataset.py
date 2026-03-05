@@ -21,13 +21,13 @@ Dataset layout (mirrors DROID):
 
 Usage:
     python scripts/generate_vjepa_dataset.py \
-        --num_episodes 100 \
-        --episode_length 150 \
-        --output_dir datasets/metaworld_pickplace \
-        --env_name pick-place-v3 \
-        --camera_names topview front gripperPOV \
-        --policy-type expert \
-        --image_size 224 \
+        --num-episodes 100 \
+        --episode-length 150 \
+        --output-dir datasets/metaworld_pickplace \
+        --env-name pick-place-v3 \
+        --camera-names topview front gripperPOV \
+        --random-action-ratio 0.3 \
+        --image-size 224 \
         --fps 15 \
         --seed 42
 """
@@ -296,8 +296,8 @@ def parse_args():
                    help="Metaworld environment name.")
     p.add_argument("--camera-names", nargs="+", default=["topview", "front", "gripperPOV"],
                    help="Camera names to render.")
-    p.add_argument("--policy-type", type=str, choices=["expert", "random"], default="expert",
-                   help="Policy to use for rollout: scripted expert or random actions.")
+    p.add_argument("--random-action-ratio", type=float, default=0.0,
+                   help="Fraction of episodes that use random policy (0.0=all expert, 1.0=all random).")
     p.add_argument("--image-size", type=int, default=224,
                    help="Height and width of rendered frames.")
     p.add_argument("--fps", type=int, default=15,
@@ -341,12 +341,19 @@ def main():
     if existing_episode_dirs:
         next_episode_idx = int(existing_episode_dirs[-1].name.split("episode_", 1)[1]) + 1
 
-    env, policy = _make_env_and_policy(
-        args.env_name,
-        args.image_size,
-        seed=args.seed,
-        policy_type=args.policy_type,
-    )
+    ratio = args.random_action_ratio
+    if not 0.0 <= ratio <= 1.0:
+        raise ValueError("--random-action-ratio must be between 0.0 and 1.0")
+
+    # Create env; also create expert policy unless every episode is random.
+    if ratio < 1.0:
+        env, expert_policy = _make_env_and_policy(
+            args.env_name, args.image_size, seed=args.seed, policy_type="expert",
+        )
+    else:
+        env, expert_policy = _make_env_and_policy(
+            args.env_name, args.image_size, seed=args.seed, policy_type="random",
+        )
 
     collected = len(existing_episode_dirs)
     attempted = len(existing_episode_dirs)
@@ -363,6 +370,15 @@ def main():
         )
         return
 
+    # Build a schedule of policy types for the remaining episodes.
+    remaining = args.num_episodes - collected
+    num_random = round(remaining * ratio)
+    num_expert = remaining - num_random
+    episode_schedule = ["expert"] * num_expert + ["random"] * num_random
+    schedule_idx = 0
+
+    print(f"Remaining {remaining} episodes: {num_expert} expert, {num_random} random")
+
     with tqdm(
         total=args.num_episodes,
         initial=collected,
@@ -373,13 +389,16 @@ def main():
             ep_seed = args.seed + attempted
             attempted += 1
 
+            current_policy_type = episode_schedule[schedule_idx]
+            policy = expert_policy if current_policy_type == "expert" else None
+
             episode_data = collect_episode(
                 env,
                 policy,
                 args.episode_length,
                 args.camera_names,
                 args.image_size,
-                policy_type=args.policy_type,
+                policy_type=current_policy_type,
                 seed=ep_seed,
             )
 
@@ -395,12 +414,14 @@ def main():
                 f.write(episode_path + "\n")
             collected += 1
             next_episode_idx += 1
+            schedule_idx += 1
 
             elapsed = time.time() - t0
             rate = collected / elapsed if elapsed > 0 else 0
             pbar.update(1)
             pbar.set_postfix(
                 saved=ep_name,
+                policy=current_policy_type,
                 success=episode_data["success"],
                 length=episode_data["proprios"].shape[0],
                 rate=f"{rate:.1f} ep/s",

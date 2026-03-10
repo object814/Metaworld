@@ -13,11 +13,13 @@ sys.path.insert(0, str(BASE_DIR))
 import metaworld
 from metaworld.wrappers import ProprioImageObsWrapper, ProprioMultiImageObsWrapper
 from metaworld.policies.sawyer_pick_place_v3_policy import SawyerPickPlaceV3Policy as pick_policy
+from metaworld.policies.sawyer_reach_v3_policy import SawyerReachV3Policy as reach_policy
 from metaworld.policies.sawyer_drawer_open_v3_policy import SawyerDrawerOpenV3Policy as drawer_policy
 from metaworld.policies.sawyer_door_open_v3_policy import SawyerDoorOpenV3Policy as door_policy
 from metaworld.policies.sawyer_door_close_v3_policy import SawyerDoorCloseV3Policy as door_close_policy
 from metaworld.policies.sawyer_door_unlock_v3_policy import SawyerDoorUnlockV3Policy as door_unlock_policy
 from metaworld.policies.sawyer_door_lock_v3_policy import SawyerDoorLockV3Policy as door_lock_policy
+from metaworld.policies.sawyer_grasp_policy import SawyerGraspV3Policy as grasp_policy
 from metaworld.policies.sawyer_assembly_v3_policy import SawyerAssemblyV3Policy as assembly_policy
 from metaworld.policies.sawyer_disassemble_v3_policy import SawyerDisassembleV3Policy as disassembly_policy
 
@@ -67,8 +69,12 @@ def render_episode(env_name,
             policy = door_unlock_policy()
         elif env_name == "door-lock-v3":
             policy = door_lock_policy()
+        elif env_name == "grasp-v3":
+            policy = grasp_policy()
         elif env_name == "assembly-v3":
             policy = assembly_policy()
+        elif env_name == "reach-v3":
+            policy = reach_policy()
         elif env_name == "disassemble-v3":
             policy = disassembly_policy()
         elif env_name == "compo-draweropen-pickplace":
@@ -135,11 +141,13 @@ if __name__ == "__main__":
     # Mapping of task names to environment names
     TASK_MAPPING = {
         "pickplace": "pick-place-v3",
+        "reach": "reach-v3",
         "draweropen": "drawer-open-v3",
         "dooropen": "door-open-v3",
         "doorclose": "door-close-v3",
         "doorunlock": "door-unlock-v3",
         "doorlock": "door-lock-v3",
+        "grasp": "grasp-v3",
         "assembly": "assembly-v3",
         "disassemble": "disassemble-v3",
         "compo-draweropen-pickplace": "compo-draweropen-pickplace",

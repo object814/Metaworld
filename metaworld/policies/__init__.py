@@ -34,6 +34,7 @@ from metaworld.policies.sawyer_drawer_close_v3_policy import SawyerDrawerCloseV3
 from metaworld.policies.sawyer_drawer_open_v3_policy import SawyerDrawerOpenV3Policy
 from metaworld.policies.sawyer_faucet_close_v3_policy import SawyerFaucetCloseV3Policy
 from metaworld.policies.sawyer_faucet_open_v3_policy import SawyerFaucetOpenV3Policy
+from metaworld.policies.sawyer_grasp_policy import SawyerGraspV3Policy
 from metaworld.policies.sawyer_hammer_v3_policy import SawyerHammerV3Policy
 from metaworld.policies.sawyer_hand_insert_v3_policy import SawyerHandInsertV3Policy
 from metaworld.policies.sawyer_handle_press_side_v3_policy import (
@@ -108,6 +109,7 @@ ENV_POLICY_MAP = dict(
         "drawer-open-v3": SawyerDrawerOpenV3Policy,
         "faucet-close-v3": SawyerFaucetCloseV3Policy,
         "faucet-open-v3": SawyerFaucetOpenV3Policy,
+        "grasp-v3": SawyerGraspV3Policy,
         "hammer-v3": SawyerHammerV3Policy,
         "hand-insert-v3": SawyerHandInsertV3Policy,
         "handle-press-side-v3": SawyerHandlePressSideV3Policy,
@@ -165,6 +167,7 @@ __all__ = [
     "SawyerDrawerOpenV3Policy",
     "SawyerFaucetCloseV3Policy",
     "SawyerFaucetOpenV3Policy",
+    "SawyerGraspV3Policy",
     "SawyerHammerV3Policy",
     "SawyerHandInsertV3Policy",
     "SawyerHandlePressSideV3Policy",

@@ -2,7 +2,6 @@
 from metaworld.envs.compo_assembly_disassembly import CompoAssemblyDisassemblyEnv
 from metaworld.envs.compo_dooropen_doorclose import CompoDoorOpenDoorCloseEnv
 from metaworld.envs.compo_draweropen_pickplace import CompoDrawerOpenPickPlaceEnv
-from metaworld.envs.compo_handlepress_handlepressside import CompoHandlePressHandlePressSideEnv
 from metaworld.envs.compo_pickplace import CompoPickPlaceEnv
 from metaworld.envs.compo_windowopen_windowclose import CompoWindowOpenWindowCloseEnv
 
@@ -30,6 +29,7 @@ from metaworld.envs.sawyer_drawer_close_v3 import SawyerDrawerCloseEnvV3
 from metaworld.envs.sawyer_drawer_open_v3 import SawyerDrawerOpenEnvV3
 from metaworld.envs.sawyer_faucet_close_v3 import SawyerFaucetCloseEnvV3
 from metaworld.envs.sawyer_faucet_open_v3 import SawyerFaucetOpenEnvV3
+from metaworld.envs.sawyer_grasp import SawyerGraspEnvV3
 from metaworld.envs.sawyer_hammer_v3 import SawyerHammerEnvV3
 from metaworld.envs.sawyer_hand_insert_v3 import SawyerHandInsertEnvV3
 from metaworld.envs.sawyer_handle_press_side_v3 import SawyerHandlePressSideEnvV3
@@ -87,6 +87,7 @@ __all__ = [
     "SawyerDrawerOpenEnvV3",
     "SawyerFaucetCloseEnvV3",
     "SawyerFaucetOpenEnvV3",
+    "SawyerGraspEnvV3",
     "SawyerHammerEnvV3",
     "SawyerHandInsertEnvV3",
     "SawyerHandlePressSideEnvV3",

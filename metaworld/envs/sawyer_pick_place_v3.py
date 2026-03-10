@@ -294,6 +294,7 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
         assert self._target_pos is not None and self.obj_init_pos is not None
         if self.reward_function_version == "v2":
             _TARGET_RADIUS: float = 0.05
+            _OBJ_RADIUS: float = 0.015
             tcp = self.tcp_center
             obj = obs[4:7]
             tcp_opened = obs[3]
@@ -310,35 +311,52 @@ class SawyerPickPlaceEnvV3(SawyerXYZEnv):
                 sigmoid="long_tail",
             )
 
-            approach = reward_utils.tolerance(
-                tcp_to_obj,
-                bounds=(0, 0.04),
-                margin=np.linalg.norm(self.obj_init_pos - self.init_tcp),
+            tcp_to_obj_xy = float(np.linalg.norm(obj[:2] - tcp[:2]))
+            xy_margin = float(np.linalg.norm(self.obj_init_pos[:2] - self.init_tcp[:2]))
+            xy_alignment = reward_utils.tolerance(
+                tcp_to_obj_xy,
+                bounds=(0.0, 0.015),
+                margin=max(xy_margin, 1e-6),
                 sigmoid="long_tail",
             )
 
-            object_grasped = self._gripper_caging_reward(action, obj)
-
-            """Original metaworld code for reference"""
-            in_place_and_object_grasped = reward_utils.hamacher_product(
-                object_grasped, in_place
+            desired_tcp_z = obj[2] + _OBJ_RADIUS
+            tcp_to_hover_z = float(abs(tcp[2] - desired_tcp_z))
+            z_margin = float(abs(self.init_tcp[2] - desired_tcp_z))
+            z_alignment = reward_utils.tolerance(
+                tcp_to_hover_z,
+                bounds=(0.0, 0.02),
+                margin=max(z_margin, 1e-6),
+                sigmoid="long_tail",
             )
-            # reward = in_place_and_object_grasped
+            approach = reward_utils.hamacher_product(xy_alignment, z_alignment)
 
-            # if (
-            #     tcp_to_obj < 0.02
-            #     and (tcp_opened > 0)
-            #     and (obj[2] - 0.01 > self.obj_init_pos[2])
-            # ):
-            #     reward += 1.0 + 5.0 * in_place
-            # if obj_to_target < _TARGET_RADIUS:
-            #     reward = 10.0
+            object_grasped = self._gripper_caging_reward(action, obj)
+            closing_reward = reward_utils.hamacher_product(
+                xy_alignment, float(np.clip(action[-1], 0.0, 1.0))
+            )
+
+            lift_to_pick = float(max(self.heightTarget - obj[2], 0.0))
+            lift_margin = max(self.heightTarget - self.obj_init_pos[2], 1e-6)
+            lift_reward = reward_utils.tolerance(
+                lift_to_pick,
+                bounds=(0.0, 0.01),
+                margin=lift_margin,
+                sigmoid="long_tail",
+            )
+
+            grasp_and_lift = reward_utils.hamacher_product(object_grasped, lift_reward)
+            transport_reward = reward_utils.hamacher_product(lift_reward, in_place)
 
             reward = (
-                0.5 * approach
-                + 2.5 * object_grasped
-                + 7.0 * in_place_and_object_grasped
+                2.0 * xy_alignment
+                + 1.0 * approach
+                + 1.0 * closing_reward
+                + 1.5 * object_grasped
+                + 1.5 * grasp_and_lift
+                + 3.0 * transport_reward
             )
+            reward = min(reward, 9.95)
             if obj_to_target < _TARGET_RADIUS:
                 reward = 10.0
 

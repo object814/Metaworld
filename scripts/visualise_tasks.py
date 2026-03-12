@@ -20,10 +20,14 @@ from metaworld.policies.sawyer_door_unlock_v3_policy import SawyerDoorUnlockV3Po
 from metaworld.policies.sawyer_door_lock_v3_policy import SawyerDoorLockV3Policy as door_lock_policy
 from metaworld.policies.sawyer_assembly_v3_policy import SawyerAssemblyV3Policy as assembly_policy
 from metaworld.policies.sawyer_disassemble_v3_policy import SawyerDisassembleV3Policy as disassembly_policy
+from metaworld.policies.sawyer_coffee_pull_v3_policy import SawyerCoffeePullV3Policy as coffee_pull_policy
+from metaworld.policies.sawyer_coffee_push_v3_policy import SawyerCoffeePushV3Policy as coffee_push_policy
+from metaworld.policies.sawyer_coffee_button_v3_policy import SawyerCoffeeButtonV3Policy as coffee_button_policy
 
 from metaworld.policies.compo_draweropen_pickplace_policy import CompoDrawerOpenPickPlacePolicy
 from metaworld.policies.compo_dooropen_doorclose_policy import CompoDoorOpenDoorClosePolicy
 from metaworld.policies.compo_assembly_disassembly_policy import CompoAssemblyDisassemblyPolicy
+from metaworld.policies.compo_coffee_push_button_pull_policy import CompoCoffeePushButtonPullPolicy
 import argparse
 
 def render_episode(env_name,
@@ -71,12 +75,20 @@ def render_episode(env_name,
             policy = assembly_policy()
         elif env_name == "disassemble-v3":
             policy = disassembly_policy()
+        elif env_name == "coffee-pull-v3":
+            policy = coffee_pull_policy()
+        elif env_name == "coffee-push-v3":
+            policy = coffee_push_policy()
+        elif env_name == "coffee-button-v3":
+            policy = coffee_button_policy()
         elif env_name == "compo-draweropen-pickplace":
             policy = CompoDrawerOpenPickPlacePolicy()
         elif env_name == "compo-dooropen-doorclose":
             policy = CompoDoorOpenDoorClosePolicy()
         elif env_name == "compo-assembly-disassembly":
             policy = CompoAssemblyDisassemblyPolicy()
+        elif env_name == "compo-coffeepushbuttonpull":
+            policy = CompoCoffeePushButtonPullPolicy()
         else:
             raise NotImplementedError(f"Policy for {env_name} is not implemented.")
     
@@ -142,17 +154,21 @@ if __name__ == "__main__":
         "doorlock": "door-lock-v3",
         "assembly": "assembly-v3",
         "disassemble": "disassemble-v3",
+        "coffeepull": "coffee-pull-v3",
+        "coffeepush": "coffee-push-v3",
+        "coffeebutton": "coffee-button-v3",
         "compo-draweropen-pickplace": "compo-draweropen-pickplace",
         "compo-dooropen-doorclose": "compo-dooropen-doorclose",
         "compo-assembly-disassembly": "compo-assembly-disassembly",
         "compo-pickplace": "compo-pickplace",
+        "compo-coffeepushbuttonpull": "compo-coffeepushbuttonpull",
     }
     
     parser = argparse.ArgumentParser(description="Visualize Meta-World tasks")
     parser.add_argument("--tasks", nargs="+", required=True, help="Task names to visualize")
     parser.add_argument("--agent", nargs="+", default=["policy"], help="Agent type per task (policy/random)")
     parser.add_argument("--length", type=int, nargs="+", help="Episode length per task")
-    parser.add_argument("--camera-name", nargs="+", default=["topview", "front", "gripperPOV"], help="Camera names")
+    parser.add_argument("--camera-name", nargs="+", default=["topview", "back", "gripperPOV"], help="Camera names")
     parser.add_argument("--env-kwargs", nargs="*", default=[], help="Extra env kwargs as key=value pairs (e.g. initialise_region=large)")
     
     args = parser.parse_args()

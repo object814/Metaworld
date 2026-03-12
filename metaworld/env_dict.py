@@ -29,7 +29,6 @@ ENV_CLS_MAP = {
     "compo-coffeepushbuttonpull": envs.CompoCoffeePushButtonPullEnv,
     "compo-dooropen-doorclose": envs.CompoDoorOpenDoorCloseEnv,
     "compo-draweropen-pickplace": envs.CompoDrawerOpenPickPlaceEnv,
-    "compo-handlepress-handlepressside": envs.CompoHandlePressHandlePressSideEnv,
     "compo-pickplace": envs.CompoPickPlaceEnv,
     "compo-windowopen-windowclose": envs.CompoWindowOpenWindowCloseEnv,
 
@@ -55,6 +54,7 @@ ENV_CLS_MAP = {
     "drawer-open-v3": envs.SawyerDrawerOpenEnvV3,
     "faucet-open-v3": envs.SawyerFaucetOpenEnvV3,
     "faucet-close-v3": envs.SawyerFaucetCloseEnvV3,
+    "grasp-v3": envs.SawyerGraspEnvV3,
     "hammer-v3": envs.SawyerHammerEnvV3,
     "handle-press-side-v3": envs.SawyerHandlePressSideEnvV3,
     "handle-press-v3": envs.SawyerHandlePressEnvV3,
@@ -254,6 +254,7 @@ ALL_V3_ENVIRONMENTS = _get_env_dict(
         "drawer-open-v3",
         "faucet-open-v3",
         "faucet-close-v3",
+        "grasp-v3",
         "hammer-v3",
         "handle-press-side-v3",
         "handle-press-v3",

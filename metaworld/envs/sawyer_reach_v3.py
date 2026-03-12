@@ -2,18 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
+import mujoco
 import numpy as np
 import numpy.typing as npt
-from gymnasium.spaces import Box
-from scipy.spatial.transform import Rotation
-
-from metaworld.asset_path_utils import full_V3_path_for
+from metaworld.envs.sawyer_pick_place_v3 import SawyerPickPlaceEnvV3
 from metaworld.sawyer_xyz_env import RenderMode, SawyerXYZEnv
-from metaworld.types import InitConfigDict
 from metaworld.utils import reward_utils
 
 
-class SawyerReachEnvV3(SawyerXYZEnv):
+class SawyerReachEnvV3(SawyerPickPlaceEnvV3):
     """SawyerReachEnv.
 
     Motivation for V3:
@@ -36,47 +33,17 @@ class SawyerReachEnvV3(SawyerXYZEnv):
         reward_function_version: str = "v2",
         height: int = 480,
         width: int = 480,
+        initialise_region: str = "large",
     ) -> None:
-        goal_low = (-0.1, 0.8, 0.05)
-        goal_high = (0.1, 0.9, 0.3)
-        hand_low = (-0.5, 0.40, 0.05)
-        hand_high = (0.5, 1, 0.5)
-        obj_low = (-0.1, 0.6, 0.02)
-        obj_high = (0.1, 0.7, 0.02)
-
         super().__init__(
-            hand_low=hand_low,
-            hand_high=hand_high,
             render_mode=render_mode,
             camera_name=camera_name,
             camera_id=camera_id,
+            reward_function_version=reward_function_version,
             height=height,
             width=width,
+            initialise_region=initialise_region,
         )
-        self.reward_function_version = reward_function_version
-
-        self.init_config: InitConfigDict = {
-            "obj_init_angle": 0.3,
-            "obj_init_pos": np.array([0.0, 0.6, 0.02]),
-            "hand_init_pos": np.array([0.0, 0.6, 0.2]),
-        }
-
-        self.goal = np.array([-0.1, 0.8, 0.2])
-
-        self.obj_init_angle = self.init_config["obj_init_angle"]
-        self.obj_init_pos = self.init_config["obj_init_pos"]
-        self.hand_init_pos = self.init_config["hand_init_pos"]
-
-        self._random_reset_space = Box(
-            np.hstack((obj_low, goal_low)),
-            np.hstack((obj_high, goal_high)),
-            dtype=np.float64,
-        )
-        self.goal_space = Box(np.array(goal_low), np.array(goal_high), dtype=np.float64)
-
-    @property
-    def model_name(self) -> str:
-        return full_V3_path_for("sawyer_xyz/sawyer_reach_v3.xml")
 
     @SawyerXYZEnv._Decorators.assert_task_is_set
     def evaluate_state(
@@ -97,41 +64,25 @@ class SawyerReachEnvV3(SawyerXYZEnv):
 
         return reward, info
 
-    def _get_pos_objects(self) -> npt.NDArray[Any]:
-        return self.get_body_com("obj")
-
-    def _get_quat_objects(self) -> npt.NDArray[Any]:
-        geom_xmat = self.data.geom("objGeom").xmat.reshape(3, 3)
-        return Rotation.from_matrix(geom_xmat).as_quat()
-
-    def fix_extreme_obj_pos(self, orig_init_pos: npt.NDArray[Any]) -> npt.NDArray[Any]:
-        # This is to account for meshes for the geom and object are not
-        # aligned. If this is not done, the object could be initialized in an
-        # extreme position
-        diff = self.get_body_com("obj")[:2] - self.get_body_com("obj")[:2]
-        adjusted_pos = orig_init_pos[:2] + diff
-        # The convention we follow is that body_com[2] is always 0,
-        # and geom_pos[2] is the object height
-        return np.array(
-            [adjusted_pos[0], adjusted_pos[1], self.get_body_com("obj")[-1]]
-        )
-
     def reset_model(self) -> npt.NDArray[np.float64]:
         self._reset_hand()
-        self._target_pos = self.goal.copy()
-        self.obj_init_pos = self.fix_extreme_obj_pos(self.init_config["obj_init_pos"])
         self.obj_init_angle = self.init_config["obj_init_angle"]
 
-        goal_pos = self._get_state_rand_vec()
-        self._target_pos = goal_pos[3:]
-        while np.linalg.norm(goal_pos[:2] - self._target_pos[:2]) < 0.15:
-            goal_pos = self._get_state_rand_vec()
-            self._target_pos = goal_pos[3:]
-        self._target_pos = goal_pos[-3:]
-        self.obj_init_pos = goal_pos[:3]
+        sampled_state = self._get_state_rand_vec()
+        self._target_pos = sampled_state[3:].copy()
+        while np.linalg.norm(sampled_state[:2] - self._target_pos[:2]) < 0.15:
+            sampled_state = self._get_state_rand_vec()
+            self._target_pos = sampled_state[3:].copy()
+
+        self.obj_init_pos = sampled_state[:3].copy()
+        self.init_tcp = self.tcp_center
+        self.init_left_pad = self.get_body_com("leftpad")
+        self.init_right_pad = self.get_body_com("rightpad")
         self._set_obj_xyz(self.obj_init_pos)
 
         self.model.site("goal").pos = self._target_pos
+        geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "objGeom")
+        self.model.geom_rgba[geom_id] = np.array([1.0, 0.0, 0.0, 1.0])
 
         self.maxReachDist = np.linalg.norm(self.init_tcp - np.array(self._target_pos))
 
@@ -159,7 +110,12 @@ class SawyerReachEnvV3(SawyerXYZEnv):
                 sigmoid="long_tail",
             )
 
-            return (10 * in_place, tcp_to_target, in_place)
+            reward = 10 * in_place # Original metaworld reward definition
+
+            # Normalise to [-1, 1]
+            reward = (reward - 5.0) / 5.0
+
+            return (reward, tcp_to_target, in_place)
         else:
             rightFinger, leftFinger = self._get_site_pos(
                 "rightEndEffector"

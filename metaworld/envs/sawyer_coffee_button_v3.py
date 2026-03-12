@@ -9,7 +9,6 @@ from gymnasium.spaces import Box
 from metaworld.asset_path_utils import full_V3_path_for
 from metaworld.sawyer_xyz_env import RenderMode, SawyerXYZEnv
 from metaworld.types import InitConfigDict
-from metaworld.utils import reward_utils
 
 
 class SawyerCoffeeButtonEnvV3(SawyerXYZEnv):
@@ -23,6 +22,10 @@ class SawyerCoffeeButtonEnvV3(SawyerXYZEnv):
         width: int = 480,
     ) -> None:
         self.max_dist = 0.03
+        self._pre_press_offset = np.array([0.0, 0.0, -0.07])
+        self._align_success_thresh = 0.05
+        self._tcp_to_button_success_thresh = 0.13
+        self._button_press_success_thresh = 0.02
 
         hand_low = (-0.5, 0.4, 0.05)
         hand_high = (0.5, 1.0, 0.5)
@@ -111,6 +114,10 @@ class SawyerCoffeeButtonEnvV3(SawyerXYZEnv):
         qvel[9:15] = 0
         self.set_state(qpos, qvel)
 
+    @staticmethod
+    def _progress_fraction(value: float, start: float, complete: float) -> float:
+        return float(np.clip((start - value) / max(start - complete, 1e-6), 0.0, 1.0))
+
     def reset_model(self) -> npt.NDArray[np.float64]:
         self._reset_hand()
 
@@ -124,9 +131,13 @@ class SawyerCoffeeButtonEnvV3(SawyerXYZEnv):
         self._target_pos = pos_button + np.array([0.0, self.max_dist, 0.0])
 
         assert self._target_pos is not None
-        self.maxDist = np.abs(
-            self._get_site_pos("buttonStart")[1] - self._target_pos[1]
+        button_start = self._get_site_pos("buttonStart")
+        self._obj_to_target_init = float(np.abs(button_start[1] - self._target_pos[1]))
+        self._align_dist_init = float(
+            np.linalg.norm((self.tcp_center - (button_start + self._pre_press_offset))[[0, 2]])
         )
+        self._tcp_to_button_init = float(np.linalg.norm(self.tcp_center - button_start))
+        self.maxDist = self._obj_to_target_init
 
         return self._get_obs()
 
@@ -142,26 +153,36 @@ class SawyerCoffeeButtonEnvV3(SawyerXYZEnv):
             tcp = self.tcp_center
 
             tcp_to_obj = float(np.linalg.norm(obj - tcp))
-            tcp_to_obj_init = float(np.linalg.norm(obj - self.init_tcp))
-            obj_to_target = abs(self._target_pos[1] - obj[1])
+            obj_to_target = float(np.abs(self._target_pos[1] - obj[1]))
 
-            tcp_closed = max(obs[3], 0.0)
-            near_button = reward_utils.tolerance(
+            pre_press_pos = obj + self._pre_press_offset
+            align_dist = float(np.linalg.norm((tcp - pre_press_pos)[[0, 2]]))
+
+            align_progress = self._progress_fraction(
+                align_dist,
+                self._align_dist_init,
+                self._align_success_thresh,
+            )
+            approach_progress = self._progress_fraction(
                 tcp_to_obj,
-                bounds=(0, 0.05),
-                margin=tcp_to_obj_init,
-                sigmoid="long_tail",
+                self._tcp_to_button_init,
+                self._tcp_to_button_success_thresh,
             )
-            button_pressed = reward_utils.tolerance(
+            near_button = 0.5 * (align_progress + approach_progress)
+            button_pressed = self._progress_fraction(
                 obj_to_target,
-                bounds=(0, 0.005),
-                margin=self.max_dist,
-                sigmoid="long_tail",
+                self._obj_to_target_init,
+                self._button_press_success_thresh,
             )
 
-            reward = 2 * reward_utils.hamacher_product(tcp_closed, near_button)
-            if tcp_to_obj <= 0.05:
-                reward += 8 * button_pressed
+            reward = 10.0 * (
+                0.4 * align_progress
+                + 0.4 * approach_progress
+                + 0.2 * button_pressed
+            )
+            
+            # Normalise to [-1, 1]
+            reward = (reward - 5.0) / 5.0
 
             return (
                 reward,

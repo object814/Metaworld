@@ -60,6 +60,12 @@ class CompoPickPlaceInitConfigDict(TypedDict):
     obj2_init_pos: npt.NDArray[Any]
 
 
+class CompoCoffeePushButtonPullInitConfigDict(TypedDict):
+    hand_init_pos: npt.NDArray[Any]
+    mug_init_pos: npt.NDArray[Any]
+    machine_pos: npt.NDArray[Any]
+
+
 class CompoHandlePressInitConfigDict(TypedDict):
     hand_init_pos: npt.NDArray[Any]
     box_init_pos: npt.NDArray[Any]

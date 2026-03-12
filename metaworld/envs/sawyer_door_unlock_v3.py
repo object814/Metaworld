@@ -47,6 +47,8 @@ class SawyerDoorUnlockEnvV3(SawyerXYZEnv):
         self.goal = np.array([0, 0.85, 0.1])
         self.obj_init_pos = self.init_config["obj_init_pos"]
         self.hand_init_pos = self.init_config["hand_init_pos"]
+        self.lock_qpos_adr = self.model.joint("lockjoint").qposadr.item()
+        self.lock_qvel_adr = self.model.joint("lockjoint").dofadr.item()
 
         self._lock_length = 0.1
 
@@ -106,8 +108,8 @@ class SawyerDoorUnlockEnvV3(SawyerXYZEnv):
     def _set_obj_xyz(self, pos: npt.NDArray[Any]) -> None:
         qpos = self.data.qpos.flat.copy()
         qvel = self.data.qvel.flat.copy()
-        qpos[9] = pos
-        qvel[9] = 0
+        qpos[self.lock_qpos_adr] = pos
+        qvel[self.lock_qvel_adr] = 0
         self.set_state(qpos, qvel)
 
     def reset_model(self) -> npt.NDArray[np.float64]:

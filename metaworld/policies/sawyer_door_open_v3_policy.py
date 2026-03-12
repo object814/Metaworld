@@ -35,7 +35,7 @@ class SawyerDoorOpenV3Policy(Policy):
     @staticmethod
     def _desired_pos(o_d: dict[str, npt.NDArray[np.float64]]) -> npt.NDArray[Any]:
         pos_curr = o_d["hand_pos"]
-        pos_door = o_d["door_pos"]
+        pos_door = o_d["door_pos"].copy()
         pos_door[0] -= 0.05
 
         # align end effector's Z axis with door handle's Z axis

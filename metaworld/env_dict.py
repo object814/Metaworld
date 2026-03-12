@@ -26,6 +26,7 @@ EnvArgsKwargsDict: TypeAlias = (
 ENV_CLS_MAP = {
     # Compo tasks
     "compo-assembly-disassembly": envs.CompoAssemblyDisassemblyEnv,
+    "compo-coffeepushbuttonpull": envs.CompoCoffeePushButtonPullEnv,
     "compo-dooropen-doorclose": envs.CompoDoorOpenDoorCloseEnv,
     "compo-draweropen-pickplace": envs.CompoDrawerOpenPickPlaceEnv,
     "compo-handlepress-handlepressside": envs.CompoHandlePressHandlePressSideEnv,
@@ -226,6 +227,7 @@ ALL_V3_ENVIRONMENTS = _get_env_dict(
     [
         # Compo tasks
         "compo-assembly-disassembly",
+        "compo-coffeepushbuttonpull",
         "compo-draweropen-pickplace",
         "compo-dooropen-doorclose",
         "compo-pickplace",

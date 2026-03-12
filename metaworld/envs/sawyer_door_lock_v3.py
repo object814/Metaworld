@@ -46,6 +46,8 @@ class SawyerDoorLockEnvV3(SawyerXYZEnv):
         self.goal = np.array([0, 0.85, 0.1])
         self.obj_init_pos = self.init_config["obj_init_pos"]
         self.hand_init_pos = self.init_config["hand_init_pos"]
+        self.lock_qpos_adr = self.model.joint("lockjoint").qposadr.item()
+        self.lock_qvel_adr = self.model.joint("lockjoint").dofadr.item()
 
         goal_low = self.hand_low
         goal_high = self.hand_high
@@ -105,10 +107,18 @@ class SawyerDoorLockEnvV3(SawyerXYZEnv):
     def _get_quat_objects(self) -> npt.NDArray[Any]:
         return self.data.body("door_link").xquat
 
+    def _set_obj_xyz(self, pos: npt.NDArray[Any]) -> None:
+        qpos = self.data.qpos.flat.copy()
+        qvel = self.data.qvel.flat.copy()
+        qpos[self.lock_qpos_adr] = pos
+        qvel[self.lock_qvel_adr] = 0
+        self.set_state(qpos, qvel)
+
     def reset_model(self) -> npt.NDArray[np.float64]:
         self._reset_hand()
         door_pos = self._get_state_rand_vec()
         self.model.body("door").pos = door_pos
+        self._set_obj_xyz(np.array(0.0))
 
         for _ in range(self.frame_skip):
             mujoco.mj_step(self.model, self.data)

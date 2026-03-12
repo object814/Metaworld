@@ -1,6 +1,9 @@
 from metaworld.policies.compo_assembly_disassembly_policy import (
     CompoAssemblyDisassemblyPolicy,
 )
+from metaworld.policies.compo_coffee_push_button_pull_policy import (
+    CompoCoffeePushButtonPullPolicy,
+)
 from metaworld.policies.compo_dooropen_doorclose_policy import (
     CompoDoorOpenDoorClosePolicy,
 )
@@ -85,6 +88,7 @@ from metaworld.policies.sawyer_window_open_v3_policy import SawyerWindowOpenV3Po
 ENV_POLICY_MAP = dict(
     {
         "compo-assembly-disassembly": CompoAssemblyDisassemblyPolicy,
+        "compo-coffeepushbuttonpull": CompoCoffeePushButtonPullPolicy,
         "compo-dooropen-doorclose": CompoDoorOpenDoorClosePolicy,
         "compo-draweropen-pickplace": CompoDrawerOpenPickPlacePolicy,
         "assembly-v3": SawyerAssemblyV3Policy,

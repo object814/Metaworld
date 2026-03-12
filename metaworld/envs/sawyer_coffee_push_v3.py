@@ -10,7 +10,6 @@ from scipy.spatial.transform import Rotation
 from metaworld.asset_path_utils import full_V3_path_for
 from metaworld.sawyer_xyz_env import RenderMode, SawyerXYZEnv
 from metaworld.types import InitConfigDict
-from metaworld.utils import reward_utils
 
 
 class SawyerCoffeePushEnvV3(SawyerXYZEnv):
@@ -23,6 +22,10 @@ class SawyerCoffeePushEnvV3(SawyerXYZEnv):
         height: int = 480,
         width: int = 480,
     ) -> None:
+        self._contact_offset = np.array([0.01, 0.0, 0.05])
+        self._contact_success_thresh = 0.04
+        self._push_success_thresh = 0.07
+
         hand_low = (-0.5, 0.40, 0.05)
         hand_high = (0.5, 1, 0.5)
         obj_low = (-0.1, 0.55, -0.001)
@@ -114,6 +117,10 @@ class SawyerCoffeePushEnvV3(SawyerXYZEnv):
         qvel[9:15] = 0
         self.set_state(qpos, qvel)
 
+    @staticmethod
+    def _progress_fraction(value: float, start: float, complete: float) -> float:
+        return float(np.clip((start - value) / max(start - complete, 1e-6), 0.0, 1.0))
+
     def reset_model(self) -> npt.NDArray[np.float64]:
         self._reset_hand()
 
@@ -134,6 +141,12 @@ class SawyerCoffeePushEnvV3(SawyerXYZEnv):
         self.maxPushDist = np.linalg.norm(
             self.obj_init_pos[:2] - np.array(self._target_pos)[:2]
         )
+        self._contact_dist_init = float(
+            np.linalg.norm(self.tcp_center - (self.obj_init_pos + self._contact_offset))
+        )
+        self._obj_to_target_init = float(
+            np.linalg.norm(self.obj_init_pos - np.array(self._target_pos))
+        )
 
         return self._get_obs()
 
@@ -144,48 +157,42 @@ class SawyerCoffeePushEnvV3(SawyerXYZEnv):
             self._target_pos is not None
         ), "`reset_model()` must be called before `compute_reward()`."
         if self.reward_function_version == "v2":
+            del action
             obj = obs[4:7]
             target = self._target_pos.copy()
 
-            # Emphasize X and Y errors
-            scale = np.array([2.0, 2.0, 1.0])
-            target_to_obj = (obj - target) * scale
-            target_to_obj = np.linalg.norm(target_to_obj)
-            target_to_obj_init = (self.obj_init_pos - target) * scale
-            target_to_obj_init = np.linalg.norm(target_to_obj_init)
-
-            in_place = reward_utils.tolerance(
-                target_to_obj,
-                bounds=(0, 0.05),
-                margin=target_to_obj_init,
-                sigmoid="long_tail",
-            )
+            contact_target = obj + self._contact_offset
             tcp_opened = obs[3]
-            tcp_to_obj = float(np.linalg.norm(obj - self.tcp_center))
+            tcp = self.tcp_center
+            tcp_to_obj = float(np.linalg.norm(obj - tcp))
+            contact_dist = float(np.linalg.norm(tcp - contact_target))
+            obj_to_target = float(np.linalg.norm(obj - target))
 
-            object_grasped = self._gripper_caging_reward(
-                action,
-                obj,
-                object_reach_radius=0.04,
-                obj_radius=0.02,
-                pad_success_thresh=0.05,
-                xz_thresh=0.05,
-                desired_gripper_effort=0.7,
-                medium_density=True,
+            grasp_reward = self._progress_fraction(
+                contact_dist,
+                self._contact_dist_init,
+                self._contact_success_thresh,
+            )
+            in_place = self._progress_fraction(
+                obj_to_target,
+                self._obj_to_target_init,
+                self._push_success_thresh,
             )
 
-            reward = reward_utils.hamacher_product(object_grasped, in_place)
-
-            if tcp_to_obj < 0.04 and tcp_opened > 0:
-                reward += 1.0 + 5.0 * in_place
-            if target_to_obj < 0.05:
+            reward = 10.0 * (0.5 * grasp_reward + 0.5 * in_place)
+            if obj_to_target <= self._push_success_thresh:
+                in_place = 1.0
                 reward = 10.0
+                
+            # Normalise to [-1, 1]
+            reward = (reward - 5.0) / 5.0
+
             return (
                 reward,
                 tcp_to_obj,
                 tcp_opened,
-                float(np.linalg.norm(obj - target)),  # recompute to avoid `scale` above
-                object_grasped,
+                obj_to_target,
+                grasp_reward,
                 in_place,
             )
         else:

@@ -294,7 +294,7 @@ def parse_args():
                    help="Root directory for the dataset.")
     p.add_argument("--env-name", type=str, default="pick-place-v3",
                    help="Metaworld environment name.")
-    p.add_argument("--camera-names", nargs="+", default=["topview", "front", "gripperPOV"],
+    p.add_argument("--camera-names", nargs="+", default=["topview", "back", "gripperPOV"],
                    help="Camera names to render.")
     p.add_argument("--random-action-ratio", type=float, default=0.0,
                    help="Fraction of episodes that use random policy (0.0=all expert, 1.0=all random).")

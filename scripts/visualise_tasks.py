@@ -25,11 +25,16 @@ from metaworld.policies.sawyer_disassemble_v3_policy import SawyerDisassembleV3P
 from metaworld.policies.sawyer_coffee_pull_v3_policy import SawyerCoffeePullV3Policy as coffee_pull_policy
 from metaworld.policies.sawyer_coffee_push_v3_policy import SawyerCoffeePushV3Policy as coffee_push_policy
 from metaworld.policies.sawyer_coffee_button_v3_policy import SawyerCoffeeButtonV3Policy as coffee_button_policy
+from metaworld.policies.sawyer_pick_place_wall_v3_policy import SawyerPickPlaceWallV3Policy as pick_place_wall_policy
+from metaworld.policies.sawyer_reach_wall_v3_policy import SawyerReachWallV3Policy as reach_wall_policy
+from metaworld.policies.sawyer_bin_picking_v3_policy import SawyerBinPickingV3Policy as bin_picking_policy
+from metaworld.policies.sawyer_box_close_v3_policy import SawyerBoxCloseV3Policy as box_close_policy
 
 from metaworld.policies.compo_draweropen_pickplace_policy import CompoDrawerOpenPickPlacePolicy
 from metaworld.policies.compo_dooropen_doorclose_policy import CompoDoorOpenDoorClosePolicy
 from metaworld.policies.compo_assembly_disassembly_policy import CompoAssemblyDisassemblyPolicy
 from metaworld.policies.compo_coffee_push_button_pull_policy import CompoCoffeePushButtonPullPolicy
+from metaworld.policies.compo_pickplace_policy import CompoPickPlacePolicy
 import argparse
 
 def render_episode(env_name,
@@ -39,7 +44,11 @@ def render_episode(env_name,
                    action_policy="random",
                    camera_name=["topview", "front", "gripperPOV"],
                    verbose=False,
-                   env_kwargs=None):
+                   env_kwargs=None,
+                   plot_reward=False,
+                   reward_plot_path=None,
+                   reward_gif_path=None,
+                   fps=15):
     if env_kwargs is None:
         env_kwargs = {}
     multiple_cameras = None
@@ -63,10 +72,18 @@ def render_episode(env_name,
     if action_policy == "policy":
         if env_name == "pick-place-v3":
             policy = pick_policy()
+        elif env_name == "pick-place-wall-v3":
+            policy = pick_place_wall_policy()
+        elif env_name == "reach-wall-v3":
+            policy = reach_wall_policy()
         elif env_name == "drawer-open-v3":
             policy = drawer_policy()
+        elif env_name == "bin-picking-v3":
+            policy = bin_picking_policy()
         elif env_name == "door-open-v3":
             policy = door_policy()
+        elif env_name == "box-close-v3":
+            policy = box_close_policy()
         elif env_name == "door-close-v3":
             policy = door_close_policy()
         elif env_name == "door-unlock-v3":
@@ -87,6 +104,8 @@ def render_episode(env_name,
             policy = coffee_push_policy()
         elif env_name == "coffee-button-v3":
             policy = coffee_button_policy()
+        elif env_name == "compo-pickplace":
+            policy = CompoPickPlacePolicy()
         elif env_name == "compo-draweropen-pickplace":
             policy = CompoDrawerOpenPickPlacePolicy()
         elif env_name == "compo-dooropen-doorclose":
@@ -99,6 +118,7 @@ def render_episode(env_name,
             raise NotImplementedError(f"Policy for {env_name} is not implemented.")
     
     frames = []
+    rewards = []
     time_stamp = time.time()
 
     obs, info = env.reset()
@@ -112,6 +132,7 @@ def render_episode(env_name,
         else:
             action = np.array([0.2, -0.2, 0.1, 0.1]) # Simple hardcoded action for testing
         obs, reward, terminated, truncated, info = env.step(action)
+        rewards.append(reward)
         if verbose:
             print(f"EE Pos: {obs['proprio'][0]:.3f}, {obs['proprio'][1]:.3f}, {obs['proprio'][2]:.3f}, EE velocity: {obs['proprio'][3]:.3f}, {obs['proprio'][4]:.3f}, {obs['proprio'][5]:.3f}, Gripper Val: {obs['proprio'][6]:.3f}")
         if not multiple_cameras:
@@ -145,15 +166,75 @@ def render_episode(env_name,
     print(f"Rendering episode to {out_path}...")
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    imageio.mimsave(out_path, frames, fps=15)
+    imageio.mimsave(out_path, frames, fps=fps)
     print(f"Wrote {out_path} ({len(frames)} frames) in {time.time()-time_stamp:.2f} seconds.")
+
+    if plot_reward:
+        if reward_plot_path is None:
+            out_path_obj = Path(out_path)
+            reward_plot_path = str(out_path_obj.with_name(f"{out_path_obj.stem}_reward.png"))
+        if reward_gif_path is None:
+            out_path_obj = Path(out_path)
+            reward_gif_path = str(out_path_obj.with_name(f"{out_path_obj.stem}_reward.gif"))
+
+        try:
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+
+            steps = np.arange(1, len(rewards) + 1)
+            plt.figure(figsize=(8, 4.5))
+            plt.plot(steps, rewards, linewidth=2)
+            plt.xlabel("Step")
+            plt.ylabel("Reward")
+            plt.title(f"Reward Curve: {env_name} ({action_policy})")
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+
+            Path(reward_plot_path).parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(reward_plot_path, dpi=150)
+            plt.close()
+            print(f"Wrote reward plot to {reward_plot_path}.")
+
+            reward_frames = []
+            reward_min = min(rewards) if len(rewards) > 0 else 0.0
+            reward_max = max(rewards) if len(rewards) > 0 else 1.0
+            if reward_min == reward_max:
+                reward_min -= 1.0
+                reward_max += 1.0
+
+            for i in range(1, len(rewards) + 1):
+                fig, ax = plt.subplots(figsize=(8, 4.5))
+                ax.plot(steps[:i], rewards[:i], linewidth=2, color="tab:blue")
+                ax.set_xlim(1, max(1, len(rewards)))
+                ax.set_ylim(reward_min, reward_max)
+                ax.set_xlabel("Step")
+                ax.set_ylabel("Reward")
+                ax.set_title(f"Reward Progress: {env_name} ({action_policy})")
+                ax.grid(True, alpha=0.3)
+                fig.tight_layout()
+
+                fig.canvas.draw()
+                frame = np.asarray(fig.canvas.buffer_rgba())[:, :, :3].copy()
+                reward_frames.append(frame)
+                plt.close(fig)
+
+            Path(reward_gif_path).parent.mkdir(parents=True, exist_ok=True)
+            imageio.mimsave(reward_gif_path, reward_frames, fps=fps)
+            print(f"Wrote reward GIF to {reward_gif_path} ({len(reward_frames)} frames @ {fps} fps).")
+        except ImportError:
+            print("Could not generate reward plot because matplotlib is not installed.")
 
 if __name__ == "__main__":
     
     # Mapping of task names to environment names
     TASK_MAPPING = {
         "pickplace": "pick-place-v3",
+        "pickplacewall": "pick-place-wall-v3",
         "reach": "reach-v3",
+        "reachwall": "reach-wall-v3",
+        "binpicking": "bin-picking-v3",
+        "boxclose": "box-close-v3",
         "draweropen": "drawer-open-v3",
         "dooropen": "door-open-v3",
         "doorclose": "door-close-v3",
@@ -178,6 +259,7 @@ if __name__ == "__main__":
     parser.add_argument("--length", type=int, nargs="+", help="Episode length per task")
     parser.add_argument("--camera-name", nargs="+", default=["topview", "back", "gripperPOV"], help="Camera names")
     parser.add_argument("--env-kwargs", nargs="*", default=[], help="Extra env kwargs as key=value pairs (e.g. initialise_region=large)")
+    parser.add_argument("--plot-reward", action="store_true", help="Save a reward-vs-step plot for each task")
     
     args = parser.parse_args()
     
@@ -206,9 +288,14 @@ if __name__ == "__main__":
             continue
         env_name = TASK_MAPPING[task]
         out_path = f"gifs/{task}_{agent}.gif"
+        reward_plot_path = f"gifs/{task}_{agent}_reward.png"
+        reward_gif_path = f"gifs/{task}_{agent}_reward.gif"
         render_episode(env_name,
                        out_path=out_path,
                        episode_length=length,
                        action_policy=agent,
                        camera_name=args.camera_name,
-                       env_kwargs=env_kwargs)
+                       env_kwargs=env_kwargs,
+                       plot_reward=args.plot_reward,
+                   reward_plot_path=reward_plot_path,
+                   reward_gif_path=reward_gif_path)

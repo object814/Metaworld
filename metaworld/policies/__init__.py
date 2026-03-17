@@ -10,6 +10,7 @@ from metaworld.policies.compo_dooropen_doorclose_policy import (
 from metaworld.policies.compo_draweropen_pickplace_policy import (
     CompoDrawerOpenPickPlacePolicy,
 )
+from metaworld.policies.compo_pickplace_block_policy import CompoPickPlaceBlockPolicy
 from metaworld.policies.sawyer_assembly_v3_policy import SawyerAssemblyV3Policy
 from metaworld.policies.sawyer_basketball_v3_policy import SawyerBasketballV3Policy
 from metaworld.policies.sawyer_bin_picking_v3_policy import SawyerBinPickingV3Policy
@@ -58,6 +59,7 @@ from metaworld.policies.sawyer_peg_unplug_side_v3_policy import (
 from metaworld.policies.sawyer_pick_out_of_hole_v3_policy import (
     SawyerPickOutOfHoleV3Policy,
 )
+from metaworld.policies.sawyer_pick_place_block_v3_policy import SawyerPickPlaceBlockV3Policy
 from metaworld.policies.sawyer_pick_place_v3_policy import SawyerPickPlaceV3Policy
 from metaworld.policies.sawyer_pick_place_wall_v3_policy import (
     SawyerPickPlaceWallV3Policy,
@@ -77,6 +79,10 @@ from metaworld.policies.sawyer_push_v3_policy import SawyerPushV3Policy
 from metaworld.policies.sawyer_push_wall_v3_policy import SawyerPushWallV3Policy
 from metaworld.policies.sawyer_reach_v3_policy import SawyerReachV3Policy
 from metaworld.policies.sawyer_reach_wall_v3_policy import SawyerReachWallV3Policy
+from metaworld.policies.sawyer_reach_xy_v3_policy import SawyerReachXYV3Policy
+from metaworld.policies.sawyer_reach_xz_v3_policy import SawyerReachXZV3Policy
+from metaworld.policies.sawyer_reach_yz_v3_policy import SawyerReachYZV3Policy
+from metaworld.policies.sawyer_reach_xyz_v3_policy import SawyerReachXYZV3Policy
 from metaworld.policies.sawyer_shelf_place_v3_policy import SawyerShelfPlaceV3Policy
 from metaworld.policies.sawyer_soccer_v3_policy import SawyerSoccerV3Policy
 from metaworld.policies.sawyer_stick_pull_v3_policy import SawyerStickPullV3Policy
@@ -92,6 +98,7 @@ ENV_POLICY_MAP = dict(
         "compo-coffeepushbuttonpull": CompoCoffeePushButtonPullPolicy,
         "compo-dooropen-doorclose": CompoDoorOpenDoorClosePolicy,
         "compo-draweropen-pickplace": CompoDrawerOpenPickPlacePolicy,
+        "compo-pickplace": CompoPickPlaceBlockPolicy,
         "assembly-v3": SawyerAssemblyV3Policy,
         "basketball-v3": SawyerBasketballV3Policy,
         "bin-picking-v3": SawyerBinPickingV3Policy,
@@ -124,6 +131,9 @@ ENV_POLICY_MAP = dict(
         "lever-pull-v3": SawyerLeverPullV3Policy,
         "peg-unplug-side-v3": SawyerPegUnplugSideV3Policy,
         "pick-out-of-hole-v3": SawyerPickOutOfHoleV3Policy,
+        "pick-place-block-v3": SawyerPickPlaceBlockV3Policy,
+        "pick-place-redblock-v3": SawyerPickPlaceBlockV3Policy,
+        "pick-place-greenblock-v3": SawyerPickPlaceBlockV3Policy,
         "pick-place-v3": SawyerPickPlaceV3Policy,
         "pick-place-wall-v3": SawyerPickPlaceWallV3Policy,
         "plate-slide-back-side-v3": SawyerPlateSlideBackSideV3Policy,
@@ -132,6 +142,10 @@ ENV_POLICY_MAP = dict(
         "plate-slide-v3": SawyerPlateSlideV3Policy,
         "reach-v3": SawyerReachV3Policy,
         "reach-wall-v3": SawyerReachWallV3Policy,
+        "reach-xy-v3": SawyerReachXYV3Policy,
+        "reach-xz-v3": SawyerReachXZV3Policy,
+        "reach-yz-v3": SawyerReachYZV3Policy,
+        "reach-xyz-v3": SawyerReachXYZV3Policy,
         "push-back-v3": SawyerPushBackV3Policy,
         "push-v3": SawyerPushV3Policy,
         "push-wall-v3": SawyerPushWallV3Policy,
@@ -150,6 +164,7 @@ __all__ = [
     "CompoAssemblyDisassemblyPolicy",
     "CompoDoorOpenDoorClosePolicy",
     "CompoDrawerOpenPickPlacePolicy",
+    "CompoPickPlaceBlockPolicy",
     "SawyerAssemblyV3Policy",
     "SawyerBasketballV3Policy",
     "SawyerBinPickingV3Policy",
@@ -182,6 +197,7 @@ __all__ = [
     "SawyerPegInsertionSideV3Policy",
     "SawyerPegUnplugSideV3Policy",
     "SawyerPickOutOfHoleV3Policy",
+    "SawyerPickPlaceBlockV3Policy",
     "SawyerPickPlaceV3Policy",
     "SawyerPickPlaceWallV3Policy",
     "SawyerPlateSlideBackSideV3Policy",
@@ -193,6 +209,10 @@ __all__ = [
     "SawyerPushWallV3Policy",
     "SawyerReachV3Policy",
     "SawyerReachWallV3Policy",
+    "SawyerReachXYV3Policy",
+    "SawyerReachXZV3Policy",
+    "SawyerReachYZV3Policy",
+    "SawyerReachXYZV3Policy",
     "SawyerShelfPlaceV3Policy",
     "SawyerSoccerV3Policy",
     "SawyerStickPullV3Policy",

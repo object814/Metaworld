@@ -13,7 +13,7 @@ from metaworld.types import CompoPickPlaceInitConfigDict
 from metaworld.utils import reward_utils
 import mujoco
 
-class CompoPickPlaceEnv(SawyerXYZEnv):
+class CompoPickPlaceBlockEnv(SawyerXYZEnv):
     """
     Sawyer Compositional Pick and Place Environment.
     """
@@ -36,9 +36,9 @@ class CompoPickPlaceEnv(SawyerXYZEnv):
         obj2_low = (0.0, 0.5, 0.02)
         obj2_high = (0.25, 0.8, 0.02)
 
-        # Initialisation bound for goal
-        goal_low = (-0.25, 0.4, 0.1)
-        goal_high = (0.0, 0.7, 0.3)
+        # Initialisation bound for goal (z fixed at table height for stacking)
+        goal_low = (-0.25, 0.4, 0.02)
+        goal_high = (0.0, 0.7, 0.02)
 
         # Task specific flag
         self.pickplace1_done = False
@@ -77,7 +77,7 @@ class CompoPickPlaceEnv(SawyerXYZEnv):
 
     @property
     def model_name(self) -> str:
-        return full_V3_path_for("sawyer_xyz/compo_pickplace.xml")
+        return full_V3_path_for("sawyer_xyz/compo_pickplace_block.xml")
 
     def reset_model(self) -> npt.NDArray[np.float64]:
         self._reset_hand()
@@ -295,8 +295,8 @@ class CompoPickPlaceEnv(SawyerXYZEnv):
             # Keep track of obj1_pos
             self.obj1_pos = self.get_body_com("obj1")
 
-            # Task end condition: obj1 placed on target and gripper opened
-            self.pickplace1_done = obj_to_target < _TARGET_RADIUS and tcp_opened > 0.9
+            # Task end condition: obj1 placed near target and gripper opened
+            self.pickplace1_done = obj_to_target < 0.05 and tcp_opened > 0.8
 
             print("DEBUG: tcp opened:", tcp_opened, " pickplace1_done:", self.pickplace1_done)
 

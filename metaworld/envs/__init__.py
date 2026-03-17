@@ -3,13 +3,19 @@ from metaworld.envs.compo_assembly_disassembly import CompoAssemblyDisassemblyEn
 from metaworld.envs.compo_dooropen_doorclose import CompoDoorOpenDoorCloseEnv
 from metaworld.envs.compo_coffee_push_button_pull import CompoCoffeePushButtonPullEnv
 from metaworld.envs.compo_draweropen_pickplace import CompoDrawerOpenPickPlaceEnv
-from metaworld.envs.compo_pickplace import CompoPickPlaceEnv
+from metaworld.envs.compo_pickplace_block import CompoPickPlaceBlockEnv
 from metaworld.envs.compo_windowopen_windowclose import CompoWindowOpenWindowCloseEnv
 
 
 from metaworld.envs.sawyer_assembly_peg_v3 import SawyerNutAssemblyEnvV3
 from metaworld.envs.sawyer_basketball_v3 import SawyerBasketballEnvV3
-from metaworld.envs.sawyer_bin_picking_v3 import SawyerBinPickingEnvV3
+from metaworld.envs.sawyer_bin_picking_v3 import (
+    SawyerBinPickingEnvV3,
+    SawyerBinPickingRedBlueEnvV3,
+    SawyerBinPickingYellowBlueEnvV3,
+    SawyerBinPickingRedPurpleEnvV3,
+    SawyerBinPickingYellowPurpleEnvV3,
+)
 from metaworld.envs.sawyer_box_close_v3 import SawyerBoxCloseEnvV3
 from metaworld.envs.sawyer_button_press_topdown_v3 import SawyerButtonPressTopdownEnvV3
 from metaworld.envs.sawyer_button_press_topdown_wall_v3 import (
@@ -41,6 +47,11 @@ from metaworld.envs.sawyer_lever_pull_v3 import SawyerLeverPullEnvV3
 from metaworld.envs.sawyer_peg_insertion_side_v3 import SawyerPegInsertionSideEnvV3
 from metaworld.envs.sawyer_peg_unplug_side_v3 import SawyerPegUnplugSideEnvV3
 from metaworld.envs.sawyer_pick_out_of_hole_v3 import SawyerPickOutOfHoleEnvV3
+from metaworld.envs.sawyer_pick_place_block_v3 import (
+    SawyerPickPlaceBlockEnvV3,
+    SawyerPickPlaceRedBlockEnvV3,
+    SawyerPickPlaceGreenBlockEnvV3,
+)
 from metaworld.envs.sawyer_pick_place_v3 import SawyerPickPlaceEnvV3
 from metaworld.envs.sawyer_pick_place_wall_v3 import SawyerPickPlaceWallEnvV3
 from metaworld.envs.sawyer_plate_slide_back_side_v3 import SawyerPlateSlideBackSideEnvV3
@@ -52,6 +63,10 @@ from metaworld.envs.sawyer_push_v3 import SawyerPushEnvV3
 from metaworld.envs.sawyer_push_wall_v3 import SawyerPushWallEnvV3
 from metaworld.envs.sawyer_reach_v3 import SawyerReachEnvV3
 from metaworld.envs.sawyer_reach_wall_v3 import SawyerReachWallEnvV3
+from metaworld.envs.sawyer_reach_xy_v3 import SawyerReachXYEnvV3
+from metaworld.envs.sawyer_reach_xz_v3 import SawyerReachXZEnvV3
+from metaworld.envs.sawyer_reach_yz_v3 import SawyerReachYZEnvV3
+from metaworld.envs.sawyer_reach_xyz_v3 import SawyerReachXYZEnvV3
 from metaworld.envs.sawyer_shelf_place_v3 import SawyerShelfPlaceEnvV3
 from metaworld.envs.sawyer_soccer_v3 import SawyerSoccerEnvV3
 from metaworld.envs.sawyer_stick_pull_v3 import SawyerStickPullEnvV3
@@ -66,11 +81,15 @@ __all__ = [
     "CompoAssemblyDisassemblyEnv",
     "CompoCoffeePushButtonPullEnv",
     "CompoDrawerOpenPickPlaceEnv",
-    "CompoPickPlaceEnv",
+    "CompoPickPlaceBlockEnv",
 
     "SawyerNutAssemblyEnvV3",
     "SawyerBasketballEnvV3",
     "SawyerBinPickingEnvV3",
+    "SawyerBinPickingRedBlueEnvV3",
+    "SawyerBinPickingYellowBlueEnvV3",
+    "SawyerBinPickingRedPurpleEnvV3",
+    "SawyerBinPickingYellowPurpleEnvV3",
     "SawyerBoxCloseEnvV3",
     "SawyerButtonPressTopdownEnvV3",
     "SawyerButtonPressTopdownWallEnvV3",
@@ -100,6 +119,9 @@ __all__ = [
     "SawyerPegInsertionSideEnvV3",
     "SawyerPegUnplugSideEnvV3",
     "SawyerPickOutOfHoleEnvV3",
+    "SawyerPickPlaceBlockEnvV3",
+    "SawyerPickPlaceRedBlockEnvV3",
+    "SawyerPickPlaceGreenBlockEnvV3",
     "SawyerPickPlaceEnvV3",
     "SawyerPickPlaceWallEnvV3",
     "SawyerPlateSlideBackSideEnvV3",
@@ -111,6 +133,10 @@ __all__ = [
     "SawyerPushWallEnvV3",
     "SawyerReachEnvV3",
     "SawyerReachWallEnvV3",
+    "SawyerReachXYEnvV3",
+    "SawyerReachXZEnvV3",
+    "SawyerReachYZEnvV3",
+    "SawyerReachXYZEnvV3",
     "SawyerShelfPlaceEnvV3",
     "SawyerSoccerEnvV3",
     "SawyerStickPullEnvV3",

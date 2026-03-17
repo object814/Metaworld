@@ -14,6 +14,10 @@ import metaworld
 from metaworld.wrappers import ProprioImageObsWrapper, ProprioMultiImageObsWrapper
 from metaworld.policies.sawyer_pick_place_v3_policy import SawyerPickPlaceV3Policy as pick_policy
 from metaworld.policies.sawyer_reach_v3_policy import SawyerReachV3Policy as reach_policy
+from metaworld.policies.sawyer_reach_xy_v3_policy import SawyerReachXYV3Policy as reach_xy_policy
+from metaworld.policies.sawyer_reach_xz_v3_policy import SawyerReachXZV3Policy as reach_xz_policy
+from metaworld.policies.sawyer_reach_yz_v3_policy import SawyerReachYZV3Policy as reach_yz_policy
+from metaworld.policies.sawyer_reach_xyz_v3_policy import SawyerReachXYZV3Policy as reach_xyz_policy
 from metaworld.policies.sawyer_drawer_open_v3_policy import SawyerDrawerOpenV3Policy as drawer_policy
 from metaworld.policies.sawyer_door_open_v3_policy import SawyerDoorOpenV3Policy as door_policy
 from metaworld.policies.sawyer_door_close_v3_policy import SawyerDoorCloseV3Policy as door_close_policy
@@ -25,16 +29,15 @@ from metaworld.policies.sawyer_disassemble_v3_policy import SawyerDisassembleV3P
 from metaworld.policies.sawyer_coffee_pull_v3_policy import SawyerCoffeePullV3Policy as coffee_pull_policy
 from metaworld.policies.sawyer_coffee_push_v3_policy import SawyerCoffeePushV3Policy as coffee_push_policy
 from metaworld.policies.sawyer_coffee_button_v3_policy import SawyerCoffeeButtonV3Policy as coffee_button_policy
-from metaworld.policies.sawyer_pick_place_wall_v3_policy import SawyerPickPlaceWallV3Policy as pick_place_wall_policy
-from metaworld.policies.sawyer_reach_wall_v3_policy import SawyerReachWallV3Policy as reach_wall_policy
 from metaworld.policies.sawyer_bin_picking_v3_policy import SawyerBinPickingV3Policy as bin_picking_policy
+from metaworld.policies.sawyer_pick_place_block_v3_policy import SawyerPickPlaceBlockV3Policy as pick_place_block_policy
 from metaworld.policies.sawyer_box_close_v3_policy import SawyerBoxCloseV3Policy as box_close_policy
 
 from metaworld.policies.compo_draweropen_pickplace_policy import CompoDrawerOpenPickPlacePolicy
 from metaworld.policies.compo_dooropen_doorclose_policy import CompoDoorOpenDoorClosePolicy
 from metaworld.policies.compo_assembly_disassembly_policy import CompoAssemblyDisassemblyPolicy
 from metaworld.policies.compo_coffee_push_button_pull_policy import CompoCoffeePushButtonPullPolicy
-from metaworld.policies.compo_pickplace_policy import CompoPickPlacePolicy
+from metaworld.policies.compo_pickplace_block_policy import CompoPickPlaceBlockPolicy
 import argparse
 
 def render_episode(env_name,
@@ -72,13 +75,11 @@ def render_episode(env_name,
     if action_policy == "policy":
         if env_name == "pick-place-v3":
             policy = pick_policy()
-        elif env_name == "pick-place-wall-v3":
-            policy = pick_place_wall_policy()
-        elif env_name == "reach-wall-v3":
-            policy = reach_wall_policy()
         elif env_name == "drawer-open-v3":
             policy = drawer_policy()
-        elif env_name == "bin-picking-v3":
+        elif env_name in ("bin-picking-v3", "bin-picking-redblue-v3",
+                          "bin-picking-yellowblue-v3", "bin-picking-redpurple-v3",
+                          "bin-picking-yellowpurple-v3"):
             policy = bin_picking_policy()
         elif env_name == "door-open-v3":
             policy = door_policy()
@@ -96,6 +97,14 @@ def render_episode(env_name,
             policy = assembly_policy()
         elif env_name == "reach-v3":
             policy = reach_policy()
+        elif env_name == "reach-xy-v3":
+            policy = reach_xy_policy()
+        elif env_name == "reach-xz-v3":
+            policy = reach_xz_policy()
+        elif env_name == "reach-yz-v3":
+            policy = reach_yz_policy()
+        elif env_name == "reach-xyz-v3":
+            policy = reach_xyz_policy()
         elif env_name == "disassemble-v3":
             policy = disassembly_policy()
         elif env_name == "coffee-pull-v3":
@@ -104,8 +113,11 @@ def render_episode(env_name,
             policy = coffee_push_policy()
         elif env_name == "coffee-button-v3":
             policy = coffee_button_policy()
-        elif env_name == "compo-pickplace":
-            policy = CompoPickPlacePolicy()
+        elif env_name in ("pick-place-block-v3", "pick-place-redblock-v3",
+                          "pick-place-greenblock-v3"):
+            policy = pick_place_block_policy()
+        elif env_name == "compo-pickplace-block":
+            policy = CompoPickPlaceBlockPolicy()
         elif env_name == "compo-draweropen-pickplace":
             policy = CompoDrawerOpenPickPlacePolicy()
         elif env_name == "compo-dooropen-doorclose":
@@ -173,9 +185,6 @@ def render_episode(env_name,
         if reward_plot_path is None:
             out_path_obj = Path(out_path)
             reward_plot_path = str(out_path_obj.with_name(f"{out_path_obj.stem}_reward.png"))
-        if reward_gif_path is None:
-            out_path_obj = Path(out_path)
-            reward_gif_path = str(out_path_obj.with_name(f"{out_path_obj.stem}_reward.gif"))
 
         try:
             import matplotlib
@@ -195,33 +204,6 @@ def render_episode(env_name,
             plt.savefig(reward_plot_path, dpi=150)
             plt.close()
             print(f"Wrote reward plot to {reward_plot_path}.")
-
-            reward_frames = []
-            reward_min = min(rewards) if len(rewards) > 0 else 0.0
-            reward_max = max(rewards) if len(rewards) > 0 else 1.0
-            if reward_min == reward_max:
-                reward_min -= 1.0
-                reward_max += 1.0
-
-            for i in range(1, len(rewards) + 1):
-                fig, ax = plt.subplots(figsize=(8, 4.5))
-                ax.plot(steps[:i], rewards[:i], linewidth=2, color="tab:blue")
-                ax.set_xlim(1, max(1, len(rewards)))
-                ax.set_ylim(reward_min, reward_max)
-                ax.set_xlabel("Step")
-                ax.set_ylabel("Reward")
-                ax.set_title(f"Reward Progress: {env_name} ({action_policy})")
-                ax.grid(True, alpha=0.3)
-                fig.tight_layout()
-
-                fig.canvas.draw()
-                frame = np.asarray(fig.canvas.buffer_rgba())[:, :, :3].copy()
-                reward_frames.append(frame)
-                plt.close(fig)
-
-            Path(reward_gif_path).parent.mkdir(parents=True, exist_ok=True)
-            imageio.mimsave(reward_gif_path, reward_frames, fps=fps)
-            print(f"Wrote reward GIF to {reward_gif_path} ({len(reward_frames)} frames @ {fps} fps).")
         except ImportError:
             print("Could not generate reward plot because matplotlib is not installed.")
 
@@ -229,11 +211,17 @@ if __name__ == "__main__":
     
     # Mapping of task names to environment names
     TASK_MAPPING = {
-        "pickplace": "pick-place-v3",
-        "pickplacewall": "pick-place-wall-v3",
+        "pnp": "pick-place-v3",
         "reach": "reach-v3",
-        "reachwall": "reach-wall-v3",
-        "binpicking": "bin-picking-v3",
+        "reachxy": "reach-xy-v3",
+        "reachxz": "reach-xz-v3",
+        "reachyz": "reach-yz-v3",
+        "reachxyz": "reach-xyz-v3",
+        "binpnp": "bin-picking-v3",
+        "binpnprb": "bin-picking-redblue-v3",
+        "binpnpyb": "bin-picking-yellowblue-v3",
+        "binpnprp": "bin-picking-redpurple-v3",
+        "binpnpyp": "bin-picking-yellowpurple-v3",
         "boxclose": "box-close-v3",
         "draweropen": "drawer-open-v3",
         "dooropen": "door-open-v3",
@@ -241,16 +229,19 @@ if __name__ == "__main__":
         "doorunlock": "door-unlock-v3",
         "doorlock": "door-lock-v3",
         "grasp": "grasp-v3",
-        "assembly": "assembly-v3",
+        "assemble": "assembly-v3",
         "disassemble": "disassemble-v3",
         "coffeepull": "coffee-pull-v3",
         "coffeepush": "coffee-push-v3",
         "coffeebutton": "coffee-button-v3",
-        "compo-draweropen-pickplace": "compo-draweropen-pickplace",
-        "compo-dooropen-doorclose": "compo-dooropen-doorclose",
-        "compo-assembly-disassembly": "compo-assembly-disassembly",
-        "compo-pickplace": "compo-pickplace",
-        "compo-coffeepushbuttonpull": "compo-coffeepushbuttonpull",
+        "pnpblock": "pick-place-block-v3",
+        "pnpredblock": "pick-place-redblock-v3",
+        "pnpgreenblock": "pick-place-greenblock-v3",
+        "compodopnp": "compo-draweropen-pickplace",
+        "compododc": "compo-dooropen-doorclose",
+        "compoad": "compo-assembly-disassembly",
+        "compopnpblock": "compo-pickplace-block",
+        "compocoffee": "compo-coffeepushbuttonpull",
     }
     
     parser = argparse.ArgumentParser(description="Visualize Meta-World tasks")
@@ -270,12 +261,16 @@ if __name__ == "__main__":
             parser.error(f"Invalid env kwarg format: {kv}. Expected key=value.")
         k, v = kv.split("=", 1)
         env_kwargs[k] = v
+
+    # Handle all tasks if "all" is specified
+    if "all" in args.tasks:
+        args.tasks = list(TASK_MAPPING.keys())
     
     # Handle defaults for length and agent
     if len(args.agent) == 1:
         args.agent = args.agent * len(args.tasks)
     if args.length is None:
-        args.length = [200] * len(args.tasks)
+        args.length = [500] * len(args.tasks)
     elif len(args.length) == 1:
         args.length = args.length * len(args.tasks)
     

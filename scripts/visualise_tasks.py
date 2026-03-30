@@ -1,6 +1,10 @@
 import os
 os.environ["MUJOCO_GL"] = "egl"
+os.environ["EGL_LOG_LEVEL"] = "fatal"
+import warnings
+warnings.filterwarnings("ignore", message="Constant.*may be too high")
 import gymnasium as gym
+gym.logger.min_level = gym.logger.ERROR
 import sys
 import time
 import imageio

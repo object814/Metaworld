@@ -37,18 +37,22 @@ class SawyerBoxCloseV3Policy(Policy):
     def _desired_pos(o_d: dict[str, npt.NDArray[np.float64]]) -> npt.NDArray[Any]:
         pos_curr = o_d["hand_pos"]
         pos_lid = o_d["lid_pos"] + np.array([0.0, 0.0, +0.02])
-        pos_box = np.array([*o_d["box_pos"], 0.15]) + np.array([0.0, 0.0, 0.0])
+        pos_box = np.array([*o_d["box_pos"], 0.15])
+        transport_z = 0.24
 
-        # If error in the XY plane is greater than 0.02, place end effector above the puck
+        # Stage 1: align over the lid before descending to grasp.
         if np.linalg.norm(pos_curr[:2] - pos_lid[:2]) > 0.01:
-            return np.array([*pos_lid[:2], 0.2])
-        # Once XY error is low enough, drop end effector down on top of puck
+            return np.array([*pos_lid[:2], transport_z])
+        # Stage 2: descend onto the lid handle.
         elif abs(pos_curr[2] - pos_lid[2]) > 0.05:
             return pos_lid
-        # If not at the same Z height as the goal, move up to that plane
-        elif abs(pos_curr[2] - pos_box[2]) > 0.04:
-            return np.array([pos_curr[0], pos_curr[1], pos_box[2]])
-        # Move to the goal
+        # Stage 3: lift in place first (hold XY fixed) to clear the box during transport.
+        elif abs(pos_curr[2] - transport_z) > 0.02:
+            return np.array([pos_curr[0], pos_curr[1], transport_z])
+        # Stage 4: move in XY only after reaching the lifted transport height.
+        elif np.linalg.norm(pos_curr[:2] - pos_box[:2]) > 0.01:
+            return np.array([pos_box[0], pos_box[1], transport_z])
+        # Stage 5: descend vertically to place the lid on the box.
         else:
             return pos_box
 

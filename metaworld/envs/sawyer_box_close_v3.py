@@ -14,6 +14,14 @@ from metaworld.utils import reward_utils
 
 
 class SawyerBoxCloseEnvV3(SawyerXYZEnv):
+    # Minimum XY center-to-center distance between lid and box.
+    BOX_MIN_DIST = 0.35
+    # XY bounds for randomizing both lid and box centers.
+    BOX_X_RANGE = (-0.25, 0.25)
+    BOX_Y_RANGE = (0.45, 0.80)
+    # Lid body position z for resting on table at reset.
+    LID_INIT_Z = -0.02
+
     def __init__(
         self,
         render_mode: RenderMode | None = None,
@@ -25,10 +33,10 @@ class SawyerBoxCloseEnvV3(SawyerXYZEnv):
     ) -> None:
         hand_low = (-0.5, 0.40, 0.05)
         hand_high = (0.5, 1, 0.5)
-        obj_low = (-0.05, 0.5, 0.02)
-        obj_high = (0.05, 0.55, 0.02)
-        goal_low = (-0.1, 0.7, 0.133)
-        goal_high = (0.1, 0.8, 0.133)
+        obj_low = (self.BOX_X_RANGE[0], self.BOX_Y_RANGE[0], 0.02)
+        obj_high = (self.BOX_X_RANGE[1], self.BOX_Y_RANGE[1], 0.02)
+        goal_low = np.array([self.BOX_X_RANGE[0], self.BOX_Y_RANGE[0], 0.133])
+        goal_high = np.array([self.BOX_X_RANGE[1], self.BOX_Y_RANGE[1], 0.133])
 
         super().__init__(
             hand_low=hand_low,
@@ -43,7 +51,7 @@ class SawyerBoxCloseEnvV3(SawyerXYZEnv):
 
         self.init_config: InitConfigDict = {
             "obj_init_angle": 0.3,
-            "obj_init_pos": np.array([0, 0.55, 0.02], dtype=np.float32),
+            "obj_init_pos": np.array([0, 0.55, self.LID_INIT_Z], dtype=np.float32),
             "hand_init_pos": np.array((0, 0.6, 0.2), dtype=np.float32),
         }
         self.goal = np.array([0.0, 0.75, 0.133])
@@ -54,9 +62,24 @@ class SawyerBoxCloseEnvV3(SawyerXYZEnv):
         self._target_to_obj_init = None
 
         self.goal_space = Box(np.array(goal_low), np.array(goal_high), dtype=np.float64)
+        # _random_reset_space: [lid_x, lid_y, box_x, box_y]
         self._random_reset_space = Box(
-            np.hstack((obj_low, goal_low)),
-            np.hstack((obj_high, goal_high)),
+            np.array(
+                [
+                    self.BOX_X_RANGE[0],
+                    self.BOX_Y_RANGE[0],
+                    self.BOX_X_RANGE[0],
+                    self.BOX_Y_RANGE[0],
+                ]
+            ),
+            np.array(
+                [
+                    self.BOX_X_RANGE[1],
+                    self.BOX_Y_RANGE[1],
+                    self.BOX_X_RANGE[1],
+                    self.BOX_Y_RANGE[1],
+                ]
+            ),
             dtype=np.float64,
         )
 
@@ -104,17 +127,38 @@ class SawyerBoxCloseEnvV3(SawyerXYZEnv):
     def _get_quat_objects(self) -> npt.NDArray[Any]:
         return self.data.body("top_link").xquat
 
+    def _sample_non_overlapping_box_lid(
+        self,
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        """Sample lid and box XY positions with a minimum separation."""
+        assert self._random_reset_space is not None
+        low = self._random_reset_space.low
+        high = self._random_reset_space.high
+        rng = self.np_random if self.seeded_rand_vec else np.random
+
+        for _ in range(1000):
+            rand_vec = rng.uniform(low, high, size=low.size).astype(np.float64)
+            lid_xy = rand_vec[:2]
+            box_xy = rand_vec[2:4]
+            if np.linalg.norm(lid_xy - box_xy) >= self.BOX_MIN_DIST:
+                self._last_rand_vec = rand_vec
+                return lid_xy, box_xy
+
+        fallback = np.array([-0.15, 0.7, 0.15, 0.7], dtype=np.float64)
+        self._last_rand_vec = fallback
+        return fallback[:2].copy(), fallback[2:4].copy()
+
     def reset_model(self) -> npt.NDArray[np.float64]:
         self._reset_hand()
         self.obj_init_pos = self.init_config["obj_init_pos"]
         self.obj_init_angle = self.init_config["obj_init_angle"]
         box_height = self.get_body_com("boxbody")[2]
 
-        goal_pos = self._get_state_rand_vec()
-        while np.linalg.norm(goal_pos[:2] - goal_pos[-3:-1]) < 0.25:
-            goal_pos = self._get_state_rand_vec()
-        self.obj_init_pos = np.concatenate([goal_pos[:2], [self.obj_init_pos[-1]]])
-        self._target_pos = goal_pos[-3:]
+        lid_xy, box_xy = self._sample_non_overlapping_box_lid()
+        self.obj_init_pos = np.array(
+            [lid_xy[0], lid_xy[1], self.LID_INIT_Z], dtype=np.float64
+        )
+        self._target_pos = np.array([box_xy[0], box_xy[1], self.goal[-1]-0.06])
 
         self.model.body("boxbody").pos = np.concatenate(
             [self._target_pos[:2], [box_height]]
@@ -125,6 +169,11 @@ class SawyerBoxCloseEnvV3(SawyerXYZEnv):
 
         self._set_obj_xyz(self.obj_init_pos)
         self.model.site("goal").pos = self._target_pos
+
+        # Cache initial gripper state for smooth caging-based grasp shaping.
+        self.init_tcp = self.tcp_center
+        self.init_left_pad = self.get_body_com("leftpad")
+        self.init_right_pad = self.get_body_com("rightpad")
 
         self.objHeight = self.data.geom("BoxHandleGeom").xpos[2]
         self.heightTarget = self.objHeight + self.liftThresh
@@ -203,6 +252,66 @@ class SawyerBoxCloseEnvV3(SawyerXYZEnv):
 
         return ready_to_lift, lifted
 
+    def _gripper_caging_reward(
+        self,
+        action: npt.NDArray[np.float32],
+        obj_pos: npt.NDArray[Any],
+    ) -> float:
+        pad_success_margin = 0.05
+        x_z_success_margin = 0.005
+        obj_radius = 0.015
+        tcp = self.tcp_center
+        left_pad = self.get_body_com("leftpad")
+        right_pad = self.get_body_com("rightpad")
+
+        delta_object_y_left_pad = left_pad[1] - obj_pos[1]
+        delta_object_y_right_pad = obj_pos[1] - right_pad[1]
+        right_caging_margin = abs(
+            abs(obj_pos[1] - self.init_right_pad[1]) - pad_success_margin
+        )
+        left_caging_margin = abs(
+            abs(obj_pos[1] - self.init_left_pad[1]) - pad_success_margin
+        )
+
+        right_caging = reward_utils.tolerance(
+            delta_object_y_right_pad,
+            bounds=(obj_radius, pad_success_margin),
+            margin=right_caging_margin,
+            sigmoid="long_tail",
+        )
+        left_caging = reward_utils.tolerance(
+            delta_object_y_left_pad,
+            bounds=(obj_radius, pad_success_margin),
+            margin=left_caging_margin,
+            sigmoid="long_tail",
+        )
+
+        y_caging = reward_utils.hamacher_product(left_caging, right_caging)
+
+        tcp_xz = tcp + np.array([0.0, -tcp[1], 0.0])
+        obj_position_x_z = np.copy(obj_pos) + np.array([0.0, -obj_pos[1], 0.0])
+        tcp_obj_norm_x_z = float(np.linalg.norm(tcp_xz - obj_position_x_z, ord=2))
+
+        assert self.obj_init_pos is not None
+        init_obj_x_z = self.obj_init_pos + np.array([0.0, -self.obj_init_pos[1], 0.0])
+        init_tcp_x_z = self.init_tcp + np.array([0.0, -self.init_tcp[1], 0.0])
+        tcp_obj_x_z_margin = (
+            np.linalg.norm(init_obj_x_z - init_tcp_x_z, ord=2) - x_z_success_margin
+        )
+
+        x_z_caging = reward_utils.tolerance(
+            tcp_obj_norm_x_z,
+            bounds=(0, x_z_success_margin),
+            margin=tcp_obj_x_z_margin,
+            sigmoid="long_tail",
+        )
+
+        caging = reward_utils.hamacher_product(y_caging, x_z_caging)
+
+        gripper_closed = np.clip(action[-1], 0.0, 1.0)
+        grasping = reward_utils.hamacher_product(caging, gripper_closed)
+        return 0.7 * caging + 0.3 * grasping
+
     def compute_reward(
         self, actions: npt.NDArray[Any], obs: npt.NDArray[np.float64]
     ) -> tuple[float, float, float, float, bool]:
@@ -210,30 +319,111 @@ class SawyerBoxCloseEnvV3(SawyerXYZEnv):
             self._target_pos is not None
         ), "`reset_model()` must be called before `compute_reward()`."
         if self.reward_function_version == "v2":
-            reward_grab = SawyerBoxCloseEnvV3._reward_grab_effort(actions)
-            reward_quat = SawyerBoxCloseEnvV3._reward_quat(obs)
-            reward_steps = SawyerBoxCloseEnvV3._reward_pos(obs, self._target_pos)
+            _TARGET_RADIUS: float = 0.05
+            _LID_RADIUS: float = 0.015
 
-            reward = sum(
-                (
-                    2.0 * reward_utils.hamacher_product(reward_grab, reward_steps[0]),
-                    8.0 * reward_steps[1],
-                )
+            tcp = self.tcp_center
+            lid_base = obs[4:7]
+            lid_handle = lid_base + np.array([0.0, 0.0, 0.02])
+            target = self._target_pos
+
+            reward_quat = SawyerBoxCloseEnvV3._reward_quat(obs)
+            reward_grab_effort = SawyerBoxCloseEnvV3._reward_grab_effort(actions)
+
+            pos_error_scale = np.array([1.0, 1.0, 3.0])
+            lid_to_target = float(np.linalg.norm((lid_handle - target) * pos_error_scale))
+            init_lid_handle = self.obj_init_pos + np.array([0.0, 0.0, 0.02])
+            in_place_margin = float(
+                np.linalg.norm((init_lid_handle - target) * pos_error_scale)
+            )
+            in_place = reward_utils.tolerance(
+                lid_to_target,
+                bounds=(0, _TARGET_RADIUS),
+                margin=max(in_place_margin, 1e-6),
+                sigmoid="long_tail",
             )
 
+            # Explicitly shape XY alignment of lid-to-box during transport.
+            lid_to_target_xy = float(np.linalg.norm(lid_handle[:2] - target[:2]))
+            target_xy_margin = float(np.linalg.norm(init_lid_handle[:2] - target[:2]))
+            xy_transport_alignment = reward_utils.tolerance(
+                lid_to_target_xy,
+                bounds=(0.0, 0.015),
+                margin=max(target_xy_margin, 1e-6),
+                sigmoid="long_tail",
+            )
+
+            tcp_to_lid_xy = float(np.linalg.norm(lid_handle[:2] - tcp[:2]))
+            xy_margin = float(np.linalg.norm(init_lid_handle[:2] - self.init_tcp[:2]))
+            xy_alignment = reward_utils.tolerance(
+                tcp_to_lid_xy,
+                bounds=(0.0, 0.015),
+                margin=max(xy_margin, 1e-6),
+                sigmoid="long_tail",
+            )
+
+            desired_tcp_z = lid_handle[2] + _LID_RADIUS
+            tcp_to_hover_z = float(abs(tcp[2] - desired_tcp_z))
+            z_margin = float(abs(self.init_tcp[2] - desired_tcp_z))
+            z_alignment = reward_utils.tolerance(
+                tcp_to_hover_z,
+                bounds=(0.0, 0.02),
+                margin=max(z_margin, 1e-6),
+                sigmoid="long_tail",
+            )
+            approach = reward_utils.hamacher_product(xy_alignment, z_alignment)
+
+            object_caging = self._gripper_caging_reward(actions, lid_base)
+            closing_reward = reward_utils.hamacher_product(xy_alignment, reward_grab_effort)
+            grasp_reward = reward_utils.hamacher_product(object_caging, closing_reward)
+
+            lift_to_pick = float(max(self.heightTarget - lid_handle[2], 0.0))
+            lift_margin = max(self.heightTarget - init_lid_handle[2], 1e-6)
+            lift_reward = reward_utils.tolerance(
+                lift_to_pick,
+                bounds=(0.0, 0.01),
+                margin=lift_margin,
+                sigmoid="long_tail",
+            )
+
+            grasp_and_lift = reward_utils.hamacher_product(grasp_reward, lift_reward)
+            lift_or_placed = max(lift_reward, in_place)
+            orientation_scale = 0.5 + 0.5 * reward_quat
+            transport_reward = orientation_scale * reward_utils.hamacher_product(
+                lift_or_placed, in_place
+            )
+            xy_transport_reward = reward_utils.hamacher_product(
+                lift_or_placed, xy_transport_alignment
+            )
+
+            reward = (
+                2.0 * xy_alignment
+                + 1.0 * approach
+                + 1.0 * closing_reward
+                + 1.0 * grasp_reward
+                + 1.0 * grasp_and_lift
+                + 2.0 * xy_transport_reward
+                + 2.0 * transport_reward
+            )
+            reward = min(float(reward), 9.95)
+
             # Override reward on success
-            success = bool(np.linalg.norm(obs[4:7] - self._target_pos) < 0.08)
+            xy_aligned = np.linalg.norm(obs[4:6] - self._target_pos[:-1]) < 0.03
+            z_reached = np.abs(obs[6] - self._target_pos[2]) < 0.03
+            print(f"XY Aligned: {xy_aligned}, Difference: {np.linalg.norm(obs[4:6] - self._target_pos[:-1])}")
+            print(f"Z Reached: {z_reached}, Difference: {np.abs(obs[6] - self._target_pos[2])}")
+            success = bool(xy_aligned and z_reached)
             if success:
                 reward = 10.0
 
-            # STRONG emphasis on proper lid orientation to prevent reward hacking
-            # (otherwise agent learns to kick-flip the lid onto the box)
-            reward *= reward_quat
+            # Normalise to [-1, 1]
+            reward = (reward - 5.0) / 5.0
 
             return (
                 reward,
-                reward_grab,
-                *reward_steps,
+                grasp_reward,
+                approach,
+                in_place,
                 success,
             )
         else:
@@ -300,6 +490,11 @@ class SawyerBoxCloseEnvV3(SawyerXYZEnv):
 
             assert (placeRew >= 0) and (pickRew >= 0)
             reward = reachRew + pickRew + placeRew
-            success = bool(np.linalg.norm(obs[4:7] - self._target_pos) < 0.08)
+
+            xy_aligned = np.linalg.norm(obs[4:6] - self._target_pos[:-1]) < 0.03
+            z_reached = np.abs(obs[6] - self._target_pos[2]) < 0.03
+            print(f"XY Aligned: {xy_aligned}, Difference: {np.linalg.norm(obs[4:6] - self._target_pos[:-1])}")
+            print(f"Z Reached: {z_reached}, Difference: {np.abs(obs[6] - self._target_pos[2])}")
+            success = bool(xy_aligned and z_reached)
 
             return float(reward), 0.0, 0.0, 0.0, success

@@ -44,6 +44,19 @@ from metaworld.policies.compo_coffee_push_button_pull_policy import CompoCoffeeP
 from metaworld.policies.compo_pickplace_block_policy import CompoPickPlaceBlockPolicy
 import argparse
 
+
+def _extract_step_success(info):
+    """Return whether the current step indicates task success."""
+    if not isinstance(info, dict):
+        return False
+    success_val = info.get("success", info.get("is_success", 0.0))
+    if isinstance(success_val, (list, tuple, np.ndarray)):
+        return np.any(np.asarray(success_val) > 0)
+    try:
+        return float(success_val) > 0
+    except (TypeError, ValueError):
+        return bool(success_val)
+
 def render_episode(env_name,
                    out_path="out.gif",
                    episode_length=500,
@@ -55,7 +68,11 @@ def render_episode(env_name,
                    plot_reward=False,
                    reward_plot_path=None,
                    reward_gif_path=None,
-                   fps=15):
+                   fps=15,
+                   save_media=True,
+                   save_on_failure=False,
+                   episode_idx=None,
+                   num_episodes=None):
     if env_kwargs is None:
         env_kwargs = {}
     multiple_cameras = None
@@ -133,14 +150,19 @@ def render_episode(env_name,
         else:
             raise NotImplementedError(f"Policy for {env_name} is not implemented.")
     
-    frames = []
+    collect_media = save_media or save_on_failure
+    frames = [] if collect_media else None
     rewards = []
     time_stamp = time.time()
 
     obs, info = env.reset()
+    episode_success = _extract_step_success(info)
     reward = 0.0
     for t in range(episode_length):
-        print(f"Step {t+1}/{episode_length} | Reward: {reward:.2f}")
+        episode_prefix = ""
+        if episode_idx is not None and num_episodes is not None:
+            episode_prefix = f"[Episode {episode_idx}/{num_episodes}] "
+        print(f"{episode_prefix}Step {t+1}/{episode_length} | Reward: {reward:.2f}")
         if action_policy == "random":
             action = env.action_space.sample()
         elif action_policy == "policy":
@@ -148,9 +170,37 @@ def render_episode(env_name,
         else:
             action = np.array([0.2, -0.2, 0.1, 0.1]) # Simple hardcoded action for testing
         obs, reward, terminated, truncated, info = env.step(action)
+        episode_success = episode_success or _extract_step_success(info)
         rewards.append(reward)
+        if terminated or truncated:
+            if collect_media:
+                if not multiple_cameras:
+                    frames.append(obs["image"])
+                else:
+                    # image observations from multiple cameras are [H, W, 3*num_cameras]
+                    img = obs["image"]
+                    h, w, c = img.shape
+                    num_cameras = c // 3
+                    camera_frames = []
+                    for i in range(num_cameras):
+                        camera_frame = img[:,:, i*3:(i+1)*3]
+                        camera_frames.append(camera_frame)
+                    combined_frame = np.concatenate(camera_frames, axis=1)
+                    # Add reward text to top-left corner of the frame
+                    combined_frame = combined_frame.copy()
+                    combined_frame = cv2.putText(combined_frame,
+                                                 f"Reward: {reward:.2f}",
+                                                 org=(10,30),
+                                                 fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                                                 fontScale=1,
+                                                 color=(255,0,0),
+                                                 thickness=2)
+                    frames.append(combined_frame)
+            break
         if verbose:
             print(f"EE Pos: {obs['proprio'][0]:.3f}, {obs['proprio'][1]:.3f}, {obs['proprio'][2]:.3f}, EE velocity: {obs['proprio'][3]:.3f}, {obs['proprio'][4]:.3f}, {obs['proprio'][5]:.3f}, Gripper Val: {obs['proprio'][6]:.3f}")
+        if not collect_media:
+            continue
         if not multiple_cameras:
             frames.append(obs["image"])
         else:
@@ -174,18 +224,24 @@ def render_episode(env_name,
                                          thickness=2)
             frames.append(combined_frame)
 
-        if terminated or truncated:
-            break
     env.close()
+
+    should_save_media = save_media or (save_on_failure and not episode_success)
     
-    print(f"Episode finished after {t+1} steps with reward {reward:.2f}.")
-    print(f"Rendering episode to {out_path}...")
+    print(
+        f"Episode finished after {t+1} steps with reward {reward:.2f}. "
+        f"Success: {episode_success}."
+    )
+    if should_save_media:
+        print(f"Rendering episode to {out_path}...")
 
-    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    imageio.mimsave(out_path, frames, fps=fps)
-    print(f"Wrote {out_path} ({len(frames)} frames) in {time.time()-time_stamp:.2f} seconds.")
+        Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+        imageio.mimsave(out_path, frames, fps=fps)
+        print(f"Wrote {out_path} ({len(frames)} frames) in {time.time()-time_stamp:.2f} seconds.")
+    else:
+        print("Skipped gif/reward artifact save for this successful non-final episode.")
 
-    if plot_reward:
+    if plot_reward and should_save_media:
         if reward_plot_path is None:
             out_path_obj = Path(out_path)
             reward_plot_path = str(out_path_obj.with_name(f"{out_path_obj.stem}_reward.png"))
@@ -210,6 +266,13 @@ def render_episode(env_name,
             print(f"Wrote reward plot to {reward_plot_path}.")
         except ImportError:
             print("Could not generate reward plot because matplotlib is not installed.")
+
+    return {
+        "success": bool(episode_success),
+        "steps": t + 1,
+        "final_reward": float(reward),
+        "saved_media": bool(should_save_media),
+    }
 
 if __name__ == "__main__":
     
@@ -255,6 +318,7 @@ if __name__ == "__main__":
     parser.add_argument("--camera-name", nargs="+", default=["topview", "back", "gripperPOV"], help="Camera names")
     parser.add_argument("--env-kwargs", nargs="*", default=[], help="Extra env kwargs as key=value pairs (e.g. initialise_region=large)")
     parser.add_argument("--plot-reward", action="store_true", help="Save a reward-vs-step plot for each task")
+    parser.add_argument("--num-episodes", type=int, default=1, help="Number of episodes to run per task")
     
     args = parser.parse_args()
     
@@ -269,6 +333,9 @@ if __name__ == "__main__":
     # Handle all tasks if "all" is specified
     if "all" in args.tasks:
         args.tasks = list(TASK_MAPPING.keys())
+
+    if args.num_episodes < 1:
+        parser.error("--num-episodes must be >= 1")
     
     # Handle defaults for length and agent
     if len(args.agent) == 1:
@@ -281,20 +348,54 @@ if __name__ == "__main__":
     assert len(args.tasks) == len(args.agent), "Number of agents must match number of tasks"
     assert len(args.tasks) == len(args.length), "Number of lengths must match number of tasks"
     
+    task_success_summary = {}
+
     for task, agent, length in zip(args.tasks, args.agent, args.length):
         if task not in TASK_MAPPING:
             print(f"Unknown task: {task}")
             continue
         env_name = TASK_MAPPING[task]
-        out_path = f"gifs/{task}_{agent}.gif"
-        reward_plot_path = f"gifs/{task}_{agent}_reward.png"
-        reward_gif_path = f"gifs/{task}_{agent}_reward.gif"
-        render_episode(env_name,
-                       out_path=out_path,
-                       episode_length=length,
-                       action_policy=agent,
-                       camera_name=args.camera_name,
-                       env_kwargs=env_kwargs,
-                       plot_reward=args.plot_reward,
-                   reward_plot_path=reward_plot_path,
-                   reward_gif_path=reward_gif_path)
+        successes = 0
+
+        for episode_idx in range(1, args.num_episodes + 1):
+            is_last_episode = episode_idx == args.num_episodes
+            if args.num_episodes == 1:
+                out_path = f"gifs/{task}_{agent}.gif"
+                reward_plot_path = f"gifs/{task}_{agent}_reward.png"
+            else:
+                out_path = f"gifs/{task}_{agent}_ep{episode_idx:03d}.gif"
+                reward_plot_path = f"gifs/{task}_{agent}_ep{episode_idx:03d}_reward.png"
+            reward_gif_path = f"gifs/{task}_{agent}_reward.gif"
+
+            result = render_episode(
+                env_name,
+                out_path=out_path,
+                episode_length=length,
+                action_policy=agent,
+                camera_name=args.camera_name,
+                env_kwargs=env_kwargs,
+                plot_reward=args.plot_reward,
+                reward_plot_path=reward_plot_path,
+                reward_gif_path=reward_gif_path,
+                save_media=(args.num_episodes == 1) or is_last_episode,
+                save_on_failure=args.num_episodes > 1,
+                episode_idx=episode_idx,
+                num_episodes=args.num_episodes,
+            )
+
+            if result["success"]:
+                successes += 1
+
+        task_success_summary[task] = {
+            "successes": successes,
+            "episodes": args.num_episodes,
+        }
+
+    if task_success_summary:
+        print("\n=== Task Success Summary ===")
+        for task, stats in task_success_summary.items():
+            success_rate = 100.0 * stats["successes"] / stats["episodes"]
+            print(
+                f"{task}: {stats['successes']}/{stats['episodes']} "
+                f"({success_rate:.1f}% success)"
+            )

@@ -410,8 +410,6 @@ class SawyerBoxCloseEnvV3(SawyerXYZEnv):
             # Override reward on success
             xy_aligned = np.linalg.norm(obs[4:6] - self._target_pos[:-1]) < 0.03
             z_reached = np.abs(obs[6] - self._target_pos[2]) < 0.03
-            print(f"XY Aligned: {xy_aligned}, Difference: {np.linalg.norm(obs[4:6] - self._target_pos[:-1])}")
-            print(f"Z Reached: {z_reached}, Difference: {np.abs(obs[6] - self._target_pos[2])}")
             success = bool(xy_aligned and z_reached)
             if success:
                 reward = 10.0
@@ -493,8 +491,6 @@ class SawyerBoxCloseEnvV3(SawyerXYZEnv):
 
             xy_aligned = np.linalg.norm(obs[4:6] - self._target_pos[:-1]) < 0.03
             z_reached = np.abs(obs[6] - self._target_pos[2]) < 0.03
-            print(f"XY Aligned: {xy_aligned}, Difference: {np.linalg.norm(obs[4:6] - self._target_pos[:-1])}")
-            print(f"Z Reached: {z_reached}, Difference: {np.abs(obs[6] - self._target_pos[2])}")
             success = bool(xy_aligned and z_reached)
 
             return float(reward), 0.0, 0.0, 0.0, success

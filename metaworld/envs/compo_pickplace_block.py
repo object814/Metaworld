@@ -298,8 +298,6 @@ class CompoPickPlaceBlockEnv(SawyerXYZEnv):
             # Task end condition: obj1 placed near target and gripper opened
             self.pickplace1_done = obj_to_target < 0.05 and tcp_opened > 0.8
 
-            print("DEBUG: tcp opened:", tcp_opened, " pickplace1_done:", self.pickplace1_done)
-
             return (
                 reward,
                 tcp_to_obj,
@@ -387,8 +385,6 @@ class CompoPickPlaceBlockEnv(SawyerXYZEnv):
 
             # Task end condition: obj2 placed on target and gripper opened
             self.pickplace2_done = obj_to_target < _TARGET_RADIUS and tcp_opened > 0.9
-
-            print("DEBUG: tcp opened:", tcp_opened, " pickplace2_done:", self.pickplace2_done)
 
             return (
                 reward,

@@ -4,6 +4,7 @@ from metaworld.envs.compo_dooropen_doorclose import CompoDoorOpenDoorCloseEnv
 from metaworld.envs.compo_coffee_push_button_pull import CompoCoffeePushButtonPullEnv
 from metaworld.envs.compo_draweropen_pickplace import CompoDrawerOpenPickPlaceEnv
 from metaworld.envs.compo_pickplace_block import CompoPickPlaceBlockEnv
+from metaworld.envs.compo_pickplace_boxclose import CompoPickPlaceBoxCloseEnv
 from metaworld.envs.compo_windowopen_windowclose import CompoWindowOpenWindowCloseEnv
 
 
@@ -82,6 +83,7 @@ __all__ = [
     "CompoCoffeePushButtonPullEnv",
     "CompoDrawerOpenPickPlaceEnv",
     "CompoPickPlaceBlockEnv",
+    "CompoPickPlaceBoxCloseEnv",
 
     "SawyerNutAssemblyEnvV3",
     "SawyerBasketballEnvV3",

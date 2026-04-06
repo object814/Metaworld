@@ -30,6 +30,7 @@ ENV_CLS_MAP = {
     "compo-dooropen-doorclose": envs.CompoDoorOpenDoorCloseEnv,
     "compo-draweropen-pickplace": envs.CompoDrawerOpenPickPlaceEnv,
     "compo-pickplace-block": envs.CompoPickPlaceBlockEnv,
+    "compo-pickplace-boxclose": envs.CompoPickPlaceBoxCloseEnv,
     "compo-windowopen-windowclose": envs.CompoWindowOpenWindowCloseEnv,
 
     "assembly-v3": envs.SawyerNutAssemblyEnvV3,
@@ -242,7 +243,8 @@ ALL_V3_ENVIRONMENTS = _get_env_dict(
         "compo-draweropen-pickplace",
         "compo-dooropen-doorclose",
         "compo-pickplace-block",
-        
+        "compo-pickplace-boxclose",
+
         "assembly-v3",
         "basketball-v3",
         "bin-picking-v3",

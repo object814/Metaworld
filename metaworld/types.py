@@ -54,6 +54,12 @@ class CompoPickPlaceDrawerInitConfigDict(TypedDict):
     obj_init_pos: npt.NDArray[Any]
     hand_init_pos: npt.NDArray[Any]
 
+class CompoPickPlaceBoxCloseInitConfigDict(TypedDict):
+    hand_init_pos: npt.NDArray[Any]
+    box_init_pos: npt.NDArray[Any]
+    obj_init_pos: npt.NDArray[Any]
+    lid_init_pos: npt.NDArray[Any]
+
 class CompoPickPlaceInitConfigDict(TypedDict):
     hand_init_pos: npt.NDArray[Any]
     obj1_init_pos: npt.NDArray[Any]

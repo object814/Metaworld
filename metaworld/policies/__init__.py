@@ -11,6 +11,7 @@ from metaworld.policies.compo_draweropen_pickplace_policy import (
     CompoDrawerOpenPickPlacePolicy,
 )
 from metaworld.policies.compo_pickplace_block_policy import CompoPickPlaceBlockPolicy
+from metaworld.policies.compo_pickplace_boxclose_policy import CompoPickPlaceBoxClosePolicy
 from metaworld.policies.sawyer_assembly_v3_policy import SawyerAssemblyV3Policy
 from metaworld.policies.sawyer_basketball_v3_policy import SawyerBasketballV3Policy
 from metaworld.policies.sawyer_bin_picking_v3_policy import SawyerBinPickingV3Policy
@@ -99,6 +100,7 @@ ENV_POLICY_MAP = dict(
         "compo-dooropen-doorclose": CompoDoorOpenDoorClosePolicy,
         "compo-draweropen-pickplace": CompoDrawerOpenPickPlacePolicy,
         "compo-pickplace": CompoPickPlaceBlockPolicy,
+        "compo-pickplace-boxclose": CompoPickPlaceBoxClosePolicy,
         "assembly-v3": SawyerAssemblyV3Policy,
         "basketball-v3": SawyerBasketballV3Policy,
         "bin-picking-v3": SawyerBinPickingV3Policy,
@@ -165,6 +167,7 @@ __all__ = [
     "CompoDoorOpenDoorClosePolicy",
     "CompoDrawerOpenPickPlacePolicy",
     "CompoPickPlaceBlockPolicy",
+    "CompoPickPlaceBoxClosePolicy",
     "SawyerAssemblyV3Policy",
     "SawyerBasketballV3Policy",
     "SawyerBinPickingV3Policy",

@@ -42,6 +42,7 @@ from metaworld.policies.compo_dooropen_doorclose_policy import CompoDoorOpenDoor
 from metaworld.policies.compo_assembly_disassembly_policy import CompoAssemblyDisassemblyPolicy
 from metaworld.policies.compo_coffee_push_button_pull_policy import CompoCoffeePushButtonPullPolicy
 from metaworld.policies.compo_pickplace_block_policy import CompoPickPlaceBlockPolicy
+from metaworld.policies.compo_pickplace_boxclose_policy import CompoPickPlaceBoxClosePolicy
 import argparse
 
 
@@ -147,6 +148,8 @@ def render_episode(env_name,
             policy = CompoAssemblyDisassemblyPolicy()
         elif env_name == "compo-coffeepushbuttonpull":
             policy = CompoCoffeePushButtonPullPolicy()
+        elif env_name == "compo-pickplace-boxclose":
+            policy = CompoPickPlaceBoxClosePolicy()
         else:
             raise NotImplementedError(f"Policy for {env_name} is not implemented.")
     
@@ -309,6 +312,7 @@ if __name__ == "__main__":
         "compoad": "compo-assembly-disassembly",
         "compopnpblock": "compo-pickplace-block",
         "compocoffee": "compo-coffeepushbuttonpull",
+        "compopnpboxclose": "compo-pickplace-boxclose",
     }
     
     parser = argparse.ArgumentParser(description="Visualize Meta-World tasks")
@@ -316,6 +320,7 @@ if __name__ == "__main__":
     parser.add_argument("--agent", nargs="+", default=["policy"], help="Agent type per task (policy/random)")
     parser.add_argument("--length", type=int, nargs="+", help="Episode length per task")
     parser.add_argument("--camera-name", nargs="+", default=["topview", "back", "gripperPOV"], help="Camera names")
+    parser.add_argument("--frame-size", type=int, default=480, help="Square image size per frame in pixels")
     parser.add_argument("--env-kwargs", nargs="*", default=[], help="Extra env kwargs as key=value pairs (e.g. initialise_region=large)")
     parser.add_argument("--plot-reward", action="store_true", help="Save a reward-vs-step plot for each task")
     parser.add_argument("--num-episodes", type=int, default=1, help="Number of episodes to run per task")
@@ -336,6 +341,8 @@ if __name__ == "__main__":
 
     if args.num_episodes < 1:
         parser.error("--num-episodes must be >= 1")
+    if args.frame_size < 1:
+        parser.error("--frame-size must be >= 1")
     
     # Handle defaults for length and agent
     if len(args.agent) == 1:
@@ -371,6 +378,7 @@ if __name__ == "__main__":
                 env_name,
                 out_path=out_path,
                 episode_length=length,
+                image_size=(args.frame_size, args.frame_size),
                 action_policy=agent,
                 camera_name=args.camera_name,
                 env_kwargs=env_kwargs,

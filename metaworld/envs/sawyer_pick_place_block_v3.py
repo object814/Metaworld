@@ -313,9 +313,11 @@ class SawyerPickPlaceBlockEnvV3(SawyerXYZEnv):
             + 1.5 * grasp_and_lift
             + 3.0 * transport_reward
         )
-        reward = min(reward, 9.95)
+        reward = min(reward, 9.5)
 
         if obj_to_target < _TARGET_RADIUS:
+            reward = 9.7
+        if obj_to_target < 0.01 and tcp_opened > 0.8:
             reward = 10.0
 
         # Normalise from [0, 10] to [-1, 1]

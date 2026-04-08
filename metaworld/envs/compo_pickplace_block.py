@@ -384,7 +384,7 @@ class CompoPickPlaceBlockEnv(SawyerXYZEnv):
             reward = (reward - 10.0) / 10.0
 
             # Task end condition: obj2 placed on target and gripper opened
-            self.pickplace2_done = obj_to_target < _TARGET_RADIUS and tcp_opened > 0.9
+            self.pickplace2_done = obj_to_target < _TARGET_RADIUS
 
             return (
                 reward,

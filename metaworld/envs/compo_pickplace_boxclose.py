@@ -343,19 +343,45 @@ class CompoPickPlaceBoxCloseEnv(SawyerXYZEnv):
             grasp_and_lift = reward_utils.hamacher_product(
                 object_grasped, lift_reward
             )
-            transport_reward = reward_utils.hamacher_product(
-                lift_reward, in_place
-            )
+
+            # Reshaped Phase-1 reward so the gradient points toward RELEASING
+            # once the block is inside the box. The old formulation rewarded
+            # holding (grasped, grasp_and_lift, transport_reward all peaked
+            # while the block was clamped in the gripper at the target) and
+            # had no term that grew with gripper opening, so the locally
+            # optimal policy was "freeze while holding the block at target"
+            # — which is exactly the sub-optimum you're seeing.
+            #
+            # New component budget (max 10):
+            #   0.5  * approach                    -> 0.5   (early guidance)
+            #   1.5  * object_grasped              -> 1.5   (grasp matters before carry)
+            #   1.0  * grasp_and_lift              -> 1.0   (lift off the table)
+            #   4.0  * in_place                    -> 4.0   (block at target, grasp-agnostic)
+            #   3.0  * in_place * tcp_release      -> 3.0   (release bonus at target)
+            #
+            # At target holding:    0.5 + 1.5 + 1.0 + 4.0 + 0.0  = 7.0
+            # At target released:   0.5 + 0.0 + 0.0 + 4.0 + 3.0  = 7.5
+            # -> Releasing is strictly better than holding at the target,
+            # and the terminal snap to 10.0 adds another +2.5 bump as soon
+            # as the transition condition fires.
+            tcp_release = float(np.clip(tcp_opened, 0.0, 1.0))
 
             reward = (
-                1.5 * approach
-                + 2.0 * object_grasped
-                + 2.0 * grasp_and_lift
-                + 4.5 * transport_reward
+                0.5 * approach
+                + 1.5 * object_grasped
+                + 1.0 * grasp_and_lift
+                + 4.0 * in_place
+                + 3.0 * in_place * tcp_release
             )
             reward = min(reward, 9.95)
 
-            if obj_to_target < _TARGET_RADIUS:
+            # Transition now REQUIRES the gripper to actually release.
+            # Previously phase 2 could start while the gripper was still
+            # clamped on the block, which made phase 2 unsolvable: any
+            # motion toward the lid dragged the block out of the box and
+            # triggered block_penalty. Adding `tcp_opened > 0.8` here
+            # guarantees phase 2 starts with a free gripper.
+            if obj_to_target < _TARGET_RADIUS and tcp_opened > 0.8:
                 reward = 10.0
                 self.pickplace_completed = True
                 # Prepare state for Phase 2
@@ -431,11 +457,39 @@ class CompoPickPlaceBoxCloseEnv(SawyerXYZEnv):
                 object_grasped, in_place
             )
 
+            # Dense "reach" reward: linear decay over the full workspace
+            # distance from tcp to the lid. The existing `approach` term
+            # uses a long_tail tolerance with bounds=(0, 0.04), which is
+            # nearly flat until the gripper is within ~10cm of the lid —
+            # after releasing the block at the box, the gripper is 30-50cm
+            # away from the lid, so `approach` provides essentially no
+            # gradient and the policy has nothing to guide it across the
+            # gap. `reach` below is a strictly monotone signal that grows
+            # with every cm of progress toward the lid, so the critic
+            # always has a direction to follow during the traversal.
+            #
+            # Margin is derived from the initial lid/hand separation with
+            # a small safety pad, so the reward saturates to ~1 only when
+            # the gripper is actually at the lid rather than partway.
+            reach_margin = float(
+                np.linalg.norm(self.lid_init_pos - self.init_tcp)
+            ) + 0.1
+            reach = max(
+                0.0, 1.0 - tcp_to_lid / max(reach_margin, 1e-6)
+            )
+
+            # Rebalanced component budget (sum still ~10 before offset):
+            #   0.5 * block_penalty           [-0.5, 0]
+            #   2.0 * reach                   [0, 2.0]  (new dense far-field)
+            #   0.5 * approach                [0, 0.5]  (kept for near-field precision)
+            #   1.5 * object_grasped          [0, 1.5]
+            #   5.5 * in_place_and_grasped    [0, 5.5]
             reward = (
                 0.5 * block_penalty
-                + 1.0 * approach
-                + 2.5 * object_grasped
-                + 7.0 * in_place_and_object_grasped
+                + 2.0 * reach
+                + 0.5 * approach
+                + 1.5 * object_grasped
+                + 5.5 * in_place_and_object_grasped
             )
             if lid_to_target < _TARGET_RADIUS:
                 reward = 10.0

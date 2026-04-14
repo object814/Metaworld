@@ -43,6 +43,15 @@ class SawyerReachXYEnvV3(SawyerXYZEnv):
         )
         self.reward_function_version = reward_function_version
 
+        # Lock the Z action: this is a 2D (XY-plane) reach task, so the
+        # world model should never observe end-effector motion along Z.
+        self._locked_action_idx = 2
+        low = self.action_space.low.copy()
+        high = self.action_space.high.copy()
+        low[self._locked_action_idx] = 0.0
+        high[self._locked_action_idx] = 0.0
+        self.action_space = Box(low, high, dtype=self.action_space.dtype)
+
         self.init_config: InitConfigDict = {
             "obj_init_angle": 0.3,
             "obj_init_pos": np.array([0, 0.6, 0.02]),
@@ -74,6 +83,11 @@ class SawyerReachXYEnvV3(SawyerXYZEnv):
     @property
     def model_name(self) -> str:
         return full_V3_path_for("sawyer_xyz/sawyer_reach_xy_v3.xml")
+
+    def step(self, action):
+        action = np.asarray(action, dtype=np.float32).copy()
+        action[self._locked_action_idx] = 0.0
+        return super().step(action)
 
     @SawyerXYZEnv._Decorators.assert_task_is_set
     def evaluate_state(

@@ -281,22 +281,45 @@ class CompoPickPlaceBlockEnv(SawyerXYZEnv):
             # if obj_to_target < _TARGET_RADIUS:
             #     reward = 10.0
 
+            # Phase 1 reward in [0, 5].
+            #
+            # Shape goal: create a smooth monotone path from
+            #   far -> approach -> grasp -> carry -> place -> RELEASE.
+            # The key change vs. the old formulation is the explicit release
+            # term (`in_place * tcp_release`), which gives a positive gradient
+            # toward *opening* the gripper once the block is at the target.
+            # Without this, the old reward only rewarded holding the block at
+            # the target (via in_place_and_grasped), so the policy had no
+            # incentive to actually let go — which is exactly the failure
+            # mode that was leaking into Phase 2.
+            #
+            # Component budget (max values shown):
+            #   0.25 * approach                             -> 0.25
+            #   1.00 * grasped * (1 - in_place)             -> 1.00  (only while carrying)
+            #   2.00 * in_place                             -> 2.00  (doesn't require grasped)
+            #   1.75 * in_place * tcp_release               -> 1.75  (release bonus at target)
+            # Sum theoretical max ~5.00; snaps to exactly 5.0 on terminal.
+            tcp_release = float(np.clip(tcp_opened, 0.0, 1.0))
+
             reward = (
-                + 0.5 * approach
-                + 2.5 * object_grasped
-                + 7.0 * in_place_and_object_grasped
+                0.25 * approach
+                + 1.0 * object_grasped * (1.0 - in_place)
+                + 2.0 * in_place
+                + 1.75 * in_place * tcp_release
             )
-            if obj_to_target < _TARGET_RADIUS:
-                reward = 10.0
+            # Terminal snap: block placed AND gripper released -> hard cap at 5.0
+            if obj_to_target < _TARGET_RADIUS and tcp_opened > 0.8:
+                reward = 5.0
 
-            # Whole task reward has a range of [0, 20], normalise to [-1, 1]
-            reward = (reward - 10.0) / 10.0
-
-            # Keep track of obj1_pos
-            self.obj1_pos = self.get_body_com("obj1")
+            # Keep track of obj1_pos — this is FROZEN at phase-1 end and used
+            # in Phase 2 both as the penalty reference and the stacking target.
+            self.obj1_pos = self.get_body_com("obj1").copy()
 
             # Task end condition: obj1 placed near target and gripper opened
             self.pickplace1_done = obj_to_target < 0.05 and tcp_opened > 0.8
+
+            # Whole task reward has a range of [0, 10], normalise to [-1, 1]
+            reward = (reward - 5.0) / 5.0
 
             return (
                 reward,
@@ -311,14 +334,24 @@ class CompoPickPlaceBlockEnv(SawyerXYZEnv):
         # PHASE 2: PICK AND PLACE OBJ2 ONTO OBJ1
         # ---------------------------------------------------------
         else:
-            # Penalty that ensures obj1 stays where it was placed
+            # Penalty that ensures obj1 stays where it was placed.
+            # Uses self.obj1_pos (FROZEN at phase-1 end), so moving obj1 after
+            # phase 1 is strictly punished regardless of where it ends up.
             current_obj1_pos = self.get_body_com("obj1")
             obj1_error = float(np.linalg.norm(current_obj1_pos - self.obj1_pos))
             penalty_for_obj1 = reward_utils.tolerance(
                 obj1_error, bounds=(0, 0.03), margin=0.2, sigmoid="long_tail",
-            ) - 1.0
-            
-            # New target position is on top of obj1
+            ) - 1.0  # in [-1, 0]
+
+            # Stacking target tracks the CURRENT obj1 position so that a
+            # physically valid stack is always reachable — if obj1 has
+            # settled/rolled slightly, the target follows it. The
+            # "don't-drag-obj1" behaviour is enforced by penalty_for_obj1
+            # above, which is computed against the FROZEN self.obj1_pos,
+            # so the policy still gets punished for deliberately moving
+            # obj1 after phase 1. Decoupling the two lets us keep the
+            # anti-cheat pressure without making stacking impossible when
+            # obj1 nudges a little under contact.
             obj2_target_pos = current_obj1_pos + np.array([0.0, 0.0, 0.03])
             
             # Update self._target_pos to place target for object
@@ -366,25 +399,42 @@ class CompoPickPlaceBlockEnv(SawyerXYZEnv):
             # if obj_to_target < _TARGET_RADIUS:
             #     reward = 10.0
 
-            reward = (
-                1.0 * penalty_for_obj1
-                + 0.5 * approach
-                + 2.5 * object_grasped
-                + 7.0 * in_place_and_object_grasped
+            # Phase 2 reward in roughly [5, 10].
+            #
+            # Structure: 5.0 baseline (so finishing Phase 1 is strictly
+            # better than any Phase-1 state) + progress on obj2 (same shape
+            # as Phase 1, budget 5) + penalty for moving obj1 (in [-1, 0]).
+            # Worst case (obj1 fully dislodged, no obj2 progress) ~= 4.0,
+            # success snaps to exactly 10.0. This keeps the overall env
+            # reward within [~0, 10] with a clean monotone across phases:
+            #   far -> approach obj2 -> grasp -> carry -> stack -> release.
+            #
+            # The penalty_for_obj1 term is what prevents the "grab red,
+            # carry it next to green, drop target on top" shortcut. Combined
+            # with the fixed obj2_target_pos above, the only high-return
+            # policy is: leave obj1 alone, go pick up obj2, stack, release.
+            tcp_release = float(np.clip(tcp_opened, 0.0, 1.0))
+
+            progress = (
+                1.0 * approach
+                + 1.0 * object_grasped * (1.0 - in_place)
+                + 2.0 * in_place
+                + 1.0 * in_place * tcp_release
             )
-            if obj_to_target < _TARGET_RADIUS:
+            reward = 5.0 + progress + 1.0 * penalty_for_obj1
+            # Terminal snap: obj2 stacked AND gripper released -> hard cap at 10.0
+            if obj_to_target < _TARGET_RADIUS and tcp_opened > 0.8:
                 reward = 10.0
 
-            # When completing the first pick and place task, we previously gave a +10 reward.
-            # If we do not add this, the agent will learn not to do the first task to avoid the drop.
-            # Also, the maximum obj1 error penalty is -1, so we additionally add +1 to ensure non-negative rewards.
-            reward += 11.0
+            # Task end condition: obj2 stacked on target and gripper opened.
+            # Added the tcp_opened requirement so "stacking" actually means
+            # the policy committed to a release, matching Phase 1's style.
+            self.pickplace2_done = obj_to_target < _TARGET_RADIUS and tcp_opened > 0.8
 
-            # Whole task reward has a range of [0, 20], normalise to [-1, 1]
-            reward = (reward - 10.0) / 10.0
 
-            # Task end condition: obj2 placed on target and gripper opened
-            self.pickplace2_done = obj_to_target < _TARGET_RADIUS
+            # Whole task reward has a range of [0, 10], normalise to [-1, 1]
+            reward = (reward - 5.0) / 5.0
+
 
             return (
                 reward,

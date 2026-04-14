@@ -330,18 +330,21 @@ class CompoDrawerOpenPickPlaceEnv(SawyerXYZEnv):
             #     reward = 10.0
 
             reward = (
-                0.5 * penalty_for_opening
-                + 1.0 * approach
+                0.25 * penalty_for_opening
+                + 1.25 * approach
                 + 2.5 * object_grasped
-                + 7.0 * in_place_and_object_grasped
+                + 6.0 * in_place_and_object_grasped
             )
             if obj_to_target < _TARGET_RADIUS:
                 reward = 10.0
 
-            # When completing the drawer open task, we previously gave a +10 reward.
-            # If we do not add this, the agent will learn not to open the drawer to avoid the drop.
-            # Also, the maximum drawer open penalty is -1, so we additionally add +1 to ensure non-negative rewards.
-            reward += 11.0
+            # Phase-2 baseline bonus to preserve stage-1 progress when opening the drawer.
+            # Dropped from +11 to +10 so that "idle gripper still camped on the handle"
+            # no longer produces a *positive* per-step reward (previously ~+0.1 after
+            # normalisation). With +10 the idle-at-handle return is ~0 while a successful
+            # place is ~+1, removing the local attractor that was causing the policy
+            # to camp on the handle instead of releasing to grab the block.
+            reward += 10.0
 
             # Whole task reward has a range of [0, 20], normalise to [-1, 1]
             reward = (reward - 10.0) / 10.0

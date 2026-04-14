@@ -172,6 +172,14 @@ def render_episode(env_name,
             action = policy.get_action(obs["original_obs"])
         else:
             action = np.array([0.2, -0.2, 0.1, 0.1]) # Simple hardcoded action for testing
+        if env_name in ("reach-xy-v3", "reach-xz-v3", "reach-yz-v3"):
+            locked = {"reach-xy-v3": ("Z", 2), "reach-xz-v3": ("Y", 1), "reach-yz-v3": ("X", 0)}[env_name]
+            policy_action = np.asarray(action, dtype=np.float32)
+            executed_action = policy_action.copy()
+            executed_action[locked[1]] = 0.0
+            def _fmt(a):
+                return f"[x={a[0]:+.3f}, y={a[1]:+.3f}, z={a[2]:+.3f}, grip={a[3]:+.3f}]"
+            print(f"  [{env_name}] Fixed {locked[0]} axis | Policy action: {_fmt(policy_action)} | Execute action: {_fmt(executed_action)}")
         obs, reward, terminated, truncated, info = env.step(action)
         episode_success = episode_success or _extract_step_success(info)
         rewards.append(reward)

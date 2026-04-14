@@ -4,3 +4,6 @@
 [submodule "third_party/vjepa2"]
 	path = third_party/vjepa2
 	url = git@github.com:object814/vjepa2.git
+[submodule "third_party/iris"]
+	path = third_party/iris
+	url = git@github.com:object814/iris.git

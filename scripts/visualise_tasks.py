@@ -290,40 +290,41 @@ if __name__ == "__main__":
     # Mapping of task names to environment names
     TASK_MAPPING = {
         "pnp": "pick-place-v3",
-        "reach": "reach-v3",
+        # "reach": "reach-v3",
         "reachxy": "reach-xy-v3",
         "reachxz": "reach-xz-v3",
         "reachyz": "reach-yz-v3",
         "reachxyz": "reach-xyz-v3",
-        "binpnp": "bin-picking-v3",
+        # "binpnp": "bin-picking-v3",
         "binpnprb": "bin-picking-redblue-v3",
         "binpnpyb": "bin-picking-yellowblue-v3",
         "binpnprp": "bin-picking-redpurple-v3",
         "binpnpyp": "bin-picking-yellowpurple-v3",
         "boxclose": "box-close-v3",
         "draweropen": "drawer-open-v3",
-        "dooropen": "door-open-v3",
-        "doorclose": "door-close-v3",
-        "doorunlock": "door-unlock-v3",
-        "doorlock": "door-lock-v3",
+        # "dooropen": "door-open-v3",
+        # "doorclose": "door-close-v3",
+        # "doorunlock": "door-unlock-v3",
+        # "doorlock": "door-lock-v3",
         "grasp": "grasp-v3",
-        "assemble": "assembly-v3",
-        "disassemble": "disassemble-v3",
-        "coffeepull": "coffee-pull-v3",
-        "coffeepush": "coffee-push-v3",
-        "coffeebutton": "coffee-button-v3",
+        # "assemble": "assembly-v3",
+        # "disassemble": "disassemble-v3",
+        # "coffeepull": "coffee-pull-v3",
+        # "coffeepush": "coffee-push-v3",
+        # "coffeebutton": "coffee-button-v3",
         "pnpblock": "pick-place-block-v3",
         "pnpredblock": "pick-place-redblock-v3",
         "pnpgreenblock": "pick-place-greenblock-v3",
         "compodopnp": "compo-draweropen-pickplace",
-        "compododc": "compo-dooropen-doorclose",
-        "compoad": "compo-assembly-disassembly",
+        # "compododc": "compo-dooropen-doorclose",
+        # "compoad": "compo-assembly-disassembly",
         "compopnpblock": "compo-pickplace-block",
-        "compocoffee": "compo-coffeepushbuttonpull",
+        # "compocoffee": "compo-coffeepushbuttonpull",
         "compopnpboxclose": "compo-pickplace-boxclose",
     }
     
     parser = argparse.ArgumentParser(description="Visualize Meta-World tasks")
+    parser.add_argument("--output-dir", type=Path, default=Path("gifs"), help="Directory to save output GIFs and plots")
     parser.add_argument("--tasks", nargs="+", required=True, help="Task names to visualize")
     parser.add_argument("--agent", nargs="+", default=["policy"], help="Agent type per task (policy/random)")
     parser.add_argument("--length", type=int, nargs="+", help="Episode length per task")
@@ -375,12 +376,12 @@ if __name__ == "__main__":
         for episode_idx in range(1, args.num_episodes + 1):
             is_last_episode = episode_idx == args.num_episodes
             if args.num_episodes == 1:
-                out_path = f"gifs/{task}_{agent}.gif"
-                reward_plot_path = f"gifs/{task}_{agent}_reward.png"
+                out_path = f"{args.output_dir}/{task}_{agent}.gif"
+                reward_plot_path = f"{args.output_dir}/{task}_{agent}_reward.png"
             else:
-                out_path = f"gifs/{task}_{agent}_ep{episode_idx:03d}.gif"
-                reward_plot_path = f"gifs/{task}_{agent}_ep{episode_idx:03d}_reward.png"
-            reward_gif_path = f"gifs/{task}_{agent}_reward.gif"
+                out_path = f"{args.output_dir}/{task}_{agent}_ep{episode_idx:03d}.gif"
+                reward_plot_path = f"{args.output_dir}/{task}_{agent}_ep{episode_idx:03d}_reward.png"
+            reward_gif_path = f"{args.output_dir}/{task}_{agent}_reward.gif"
 
             result = render_episode(
                 env_name,

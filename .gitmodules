@@ -7,3 +7,9 @@
 [submodule "third_party/iris"]
 	path = third_party/iris
 	url = git@github.com:object814/iris.git
+[submodule "third_party/STORM"]
+	path = third_party/STORM
+	url = git@github.com:object814/STORM.git
+[submodule "third_party/tdmpc2"]
+	path = third_party/tdmpc2
+	url = git@github.com:object814/tdmpc2.git

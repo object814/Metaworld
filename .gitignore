@@ -159,3 +159,7 @@ flake.lock
 gifs/
 *.sif
 datasets/
+
+conda/
+.wandb*
+third_party/logdir/

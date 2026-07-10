@@ -10,3 +10,4 @@
 [submodule "third_party/tdmpc2"]
 	path = third_party/tdmpc2
 	url = git@github.com:object814/tdmpc2.git
+	branch = pwm

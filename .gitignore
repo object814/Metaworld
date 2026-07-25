@@ -163,3 +163,4 @@ datasets/
 conda/
 .wandb*
 third_party/logdir/
+.claude
